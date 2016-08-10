@@ -1,0 +1,10 @@
+Cython   
+jupyter  
+ipywidgets
+matplotlib
+numpy
+pandas
+Pillow 
+scipy
+tifffile
+images2gif
