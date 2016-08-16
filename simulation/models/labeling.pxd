@@ -1,13 +1,18 @@
+'''
+labeling.pxd
+
+The BrainbowUnit class
+'''
 import numpy as np
 cimport numpy as np
 
-cdef class BrainBowUnit:
+cdef class BrainbowUnit:
     #Attributes
     cdef public float protein_density
     cdef public float labeling_density
     cdef public int antibody_amplification_factor
     cdef public object fluor_types_used
-    cdef int num_channels
+    cdef public int num_fluorophores
     cdef public float fluor_noise
     #Methods
     cpdef object perform_labeling(self, object dict_for_labeling, object dict_for_gt, object volume_dims, object voxel_dims)

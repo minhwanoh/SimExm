@@ -1,4 +1,9 @@
-import sys; sys.path.insert(0, "../")
+#Select SimExm path
+path_to_SimExm = ''
+
+import sys; sys.path.insert(0, path_to_SimExm)
+
+#Other imports
 from database.models import DatabaseSession
 from simulation.methods import run_simulation
 from scipy.misc import toimage
@@ -36,20 +41,18 @@ fluor_noise = 0.00001
 """
 
 #Input params here
-#labelingUnit = BrainBowUnit(ds, fluor_noise = 0.01, labeling_density = 0.1, protein_density = 0.1)
-labelingUnit = BrainbowPlusCytosolic(brainbow_protein_density = 0.8, brainbow_labeling_density = 0.25, brainbow_fluors = ['ATTO488', 'ATTO550'],\
-      cytosolic_protein_density = 0.8, cytosolic_labeling_density = 0.1 , cytosloic_fluors = ['ATTO647N'],\
-       antibody_amplification_factor = 5, fluor_noise = 0.00001)
+labelingUnit = BrainBowUnit(fluor_noise = 0.01, labeling_density = 0.1, protein_density = 0.1)
 
 #Input optics parameteres
 """
 Default:
 
-laser_wavelengths = [488, 565, 660], laser_power  = [50, 50, 50]
+num_channels =  3
+laser_wavelengths = [488, 565, 660]
+laser_power  = [50, 50, 50]
 laser_percentage   = [0.25, 0.25, 0.25]
 objective_back_aperture  = 1.0
-baseline = 50
-std_dev_baseline = 5
+baseline = [50, 50, 50]
 filters = [[450, 550], [550, 625], [625, 950]]
 exposure_time  = 0.1
 numerical_aperture  = 1.15
@@ -58,11 +61,10 @@ detector_efficiency  = 0.6
 focal_plane_depth  = 500
 objective_factor  = 40.0
 pixel_size = 6500
-precision  = 1.0
 """
 
 #Input params here
-opticalUnit = Confocal(ds, baseline = 30, std_dev_baseline = 50, numerical_aperture = 1.1)
+opticalUnit = Confocal(ds, baseline = [30, 30, 30], numerical_aperture = 1.1)
 
 
 #RUN, don't modify this line
@@ -83,4 +85,3 @@ make_tiff_stack(ground_truth, path=dest, name="simulation_train_gt", rgb=False, 
 #dest_gt = "/Users/Jeremy/Desktop/simulation3_gt"
 #save_image_sequence(images, dest, rgb=True)
 #save_image_sequence(images, dest_gt, rgb=False)
-

@@ -1,7 +1,13 @@
+'''
+optics.pxd
+
+The OpticalUnit class
+'''
+
 import numpy as np
 cimport numpy as np
 
-cdef class Confocal:
+cdef class ConfocalUnit:
     #Attributes
     cdef public int num_channels
     cdef object ds

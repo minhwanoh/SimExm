@@ -1,4 +1,10 @@
-# cython: profile=False
+
+'''
+optics.pxd
+
+The OpticalUnit class
+'''
+
 import numpy as np
 import cython
 cimport cython
@@ -6,7 +12,7 @@ cimport numpy as np
 import scipy.ndimage
 import scipy.misc
 import scipy.signal
-from math import ceil, floor, log, sqrt, pi, exp, asin
+from math import log, sqrt, pi, exp, asin
 import database.methods.fluorophore as f
 from cython.parallel cimport prange, parallel
 from visualization.methods import make_gif
@@ -14,13 +20,13 @@ from visualization.methods import make_gif
 
 ##################### OPTICS #####################
 
-cdef class Confocal:
-    def __cinit__(self, ds, num_channels =3,  laser_wavelengths = [488, 565, 660], laser_power  = [50, 50, 50], \
+cdef class ConfocalUnit:
+    def __cinit__(self, num_channels =3,  laser_wavelengths = [488, 565, 660], laser_power  = [50, 50, 50], \
             laser_percentage   = [0.25, 0.25, 0.25], objective_back_aperture  = 1.0, baseline = [30,30,30],\
         std_dev_baseline = [50, 50, 50], filters = [[450, 550], [550, 625], [625, 950]], exposure_time  = 0.1 ,\
         numerical_aperture  = 1.15, objective_efficiency  = 0.8, detector_efficiency  = 0.6,\
         focal_plane_depth  = 500, objective_factor  = 40.0, pixel_size = 6500, precision  = 1.0):
-        self.ds = ds
+
         self.num_channels = num_channels
         self.laser_wavelengths = laser_wavelengths # [nm]
         self.laser_power  = laser_power # [milliWatts]
@@ -36,7 +42,7 @@ cdef class Confocal:
         self.focal_plane_depth  = focal_plane_depth # [nm] thickness of each focus plane
         self.objective_factor  = objective_factor # magnification factor of objective lens
         self.pixel_size  = pixel_size # [nm] the width of each pixel
-        self.precision  = precision # internal parameter used in blurring)
+
         #assert((num_channels == length(laser_wavelengths)) and (num_channels == length(laser_intensities)) and (num_channels == filters_size(1)))
 
     ''' Calculates remaining parameters '''
@@ -46,7 +52,7 @@ cdef class Confocal:
         self.scale_factor_xy  = voxel_dims[0] * self.objective_factor * self.precision / self.pixel_size
         self.z_offset_step = <int>ceil(<float>self.focal_plane_depth / <float>voxel_dims[2])
         self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (4.44 * self.numerical_aperture * voxel_dims[0]) for i in range(len(self.laser_wavelengths))]
-        self.std_dev_z  = [((1.037 * self.laser_wavelengths[i])  * self.precision) / ((self.numerical_aperture ** 2) *  voxel_dims[2])  for i in range(len(self.laser_wavelengths))]
+        self.std_dev_z  = [((1.037 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[2])  for i in range(len(self.laser_wavelengths))]
         cdef int slices_required = <int> ceil(8 * max(self.std_dev_z) + <float>(num_slices * self.focal_plane_depth) / <float> voxel_dims[2])
         return slices_required
 
@@ -61,10 +67,10 @@ cdef class Confocal:
         (num_fluors_per_channel, X, Y, Z) = volume
 
         #Perform magnification
-        x = ceil(ceil(volume_dims[0] * self.scale_factor_xy) * (1.0 / self.precision))
-        y = ceil(ceil(volume_dims[1] * self.scale_factor_xy) * (1.0 / self.precision))
-        X = np.floor(np.floor(self.scale_factor_xy * X) * (1.0 / self.precision)).astype(np.int64)
-        Y = np.floor(np.floor(self.scale_factor_xy * Y) * (1.0 / self.precision)).astype(np.int64)
+        x = np.ceil(volume_dims[0] * self.scale_factor_xy)
+        y = np.ceil(volume_dims[1] * self.scale_factor_xy) 
+        X = np.floor(self.scale_factor_xy * X).astype(np.int64)
+        Y = np.floor(self.scale_factor_xy * Y).astype(np.int64)
 
         #Get initial photon counts
         mean_photons_per_fluor = self.get_mean_number_photons_per_fluor(all_fluor_types, channel)
@@ -197,7 +203,7 @@ cdef class Confocal:
         cdef np.ndarray[np.float64_t, ndim=3] kernel, w_z
         size_r = <float> self.pixel_size / <float>self.objective_factor
         size_z = ceil(<float> self.focal_plane_depth / <float> self.z_offset_step)
-        (x, y, z) = (16 * ceil(sigma_x) , 16 * ceil(sigma_y) , 4 * ceil(sigma_z))
+        (x, y, z) = (8 * ceil(sigma_x) , 8 * ceil(sigma_y) , 4 * ceil(sigma_z))
         (x_0, y_0, z_0) = (<float>x / 2.0, <float>y / 2.0,  <float>0.0)
         indices = np.indices((z, x, y), dtype=np.float64)
         w_0 =  <float>self.laser_wavelengths[channel] / (<float> pi * self.numerical_aperture)

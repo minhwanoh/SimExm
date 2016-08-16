@@ -17,10 +17,6 @@ sim_modules = ["labeling", "optics"]
 for sim_module in sim_modules:
 	extensions.append(Extension("simulation/models/" + sim_module, ["simulation/models/" + sim_module + ".pyx"], include_dirs = [numpy.get_include(), "simulation/models/", "./"], extra_compile_args=["-O3", "-w"]))#"-fopenmp"]))
 
-# Visualization
-visualization_modules = ["methods"]
-for visualization_module in visualization_modules:
-	extensions.append(Extension("visualization/" + visualization_module, ["visualization/" + visualization_module + ".pyx"], include_dirs = [numpy.get_include(), "visualization/", "./"], extra_compile_args=["-O3", "-w"]))
 
 setup(
     ext_modules = cythonize(extensions, compiler_directives={'extra_compile_args': ["-03"] }, annotate=False),

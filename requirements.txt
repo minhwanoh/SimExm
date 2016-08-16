@@ -3,8 +3,8 @@ jupyter
 ipywidgets
 matplotlib
 numpy
-pandas
 Pillow 
 scipy
 tifffile
 images2gif
+h5py
