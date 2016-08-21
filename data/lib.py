@@ -28,30 +28,66 @@ def load_image_stack(db_path, voxel_dim, cell_stack, region_annotations = [], re
 	all_cell_ids = cell_stack[non_zero].unique()
 
 	for cell_id in all_cell_ids:
+		#Create Cell object
+		cell_type = cell_type_dict[cell_id] if cell_type_dict else None
+		cell = Cell(cell_id, cell_type)
+		#Load main voxels and compute membrane
+		load_cell(cell, cell_stack, non_zero)
 
-		voxel_list = np.where(cell_stack[non_zero] == cell_id)
-		voxel_list = non_zero[voxel_list]
-		(X, Y, Z) = np.tranpose(voxel_list)
-		#Hack to compute membranes
-		membrane = np.where(cell_stack[X - 1 : X + 1, Y - 1 : Y + 1, Z].unique().size == 1])
-		membrane_list = voxel_list[membrane]
-
-		cell = Cell(cell_id, voxels = voxel_list, membrane = membrane_list)
-		if cell_type_dict: cell.set_cell_type(cell_type_dict[cell_id])
-
-		#Load region annotations
+		#Load other annotations
 		for i range(len(region_annotations)):
-			region_stack = region_annotations[i]
-			all_region_ids = region_stack[voxel_list].unique()[1:] #remove 0
-			for region_id in all_region_ids:
-				indices = np.where(region_stack[voxel_list] == region_id)
-				membrane_indices = np.where(region_stack[membrane_list] == region_id)
-				region = CellRegion(voxel_list[indices], membrane_list[membrane_indices], region_types[i], region_id)
-				cell.add_region(region)
+			#Load region annotations
+			load_region(cell, region_annotations[i] region_types[i])
 
 		dataset.add_cell(cell)
 
 	return dataset
+
+
+def load_cell(cell, cell_stack, non_zero):
+	'''
+	Helper function to load_image_stack, loads a cell by computing its voxels in three dimension as well as its edges (i.e membrane)
+
+	cell (Cell) : the cell object to which we will add the full and membrane locations
+	cell_stack (numpy X x Y x Z array, uint32) : stack of ground truth data. Each voxel should have a cell_id as value, and 0 if extra-cellular space.
+	non_zero (numpy X x Y x Z array, bool) : the non_zero locations, for faster loading 
+	'''
+
+	#Find cell voxels
+	voxel_list = np.where(cell_stack[non_zero] == cell.get_cell_id())
+	voxel_list = non_zero[voxel_list]
+	(X, Y, Z) = np.tranpose(voxel_list)
+	#Hack to compute membranes
+	membrane = np.where(cell_stack[X - 1 : X + 1, Y - 1 : Y + 1, Z].unique().size == 1])
+	membrane_list = voxel_list[membrane]
+	#Set the region 'full', this method is a shortcut (i.e region_id = 1 and region_type = 'full')
+	cell.set_full_cell(voxels = voxel_list, membrane = membrane_list)
+
+
+
+def load_region(cell, region_stack, region_type):
+	'''
+	Helper function to load_image_stack. Loads an annotated region. 
+	Such region could be synapses, dendrites, axons, mitochondria.. 
+	The idea is to use image stacks which have the region_id as value. By superposing the cell_stack,
+	we can easily reconstruct which regions belong to what cell and further divide them by region_id, 
+    for instance to label a specific synapse and not others.
+
+	cell (Cell) : the cell object to which we will add the region annotation
+	region_stack (numpy X x Y x Z array, uint32) : stack of ground truth data. Each voxel should have a region_id as value, and 0 if extra-cellular space.
+	region_type (string) : the type of region this data is annotating, for future querying.
+	'''
+
+	voxel_list = cell.get_full_cell()
+	membrane_list = cell.get_full_cell(membrane_only = True)
+
+	all_region_ids = region_stack[voxel_list].unique()[1:] #remove 0
+	for region_id in all_region_ids:
+		indices = np.where(region_stack[voxel_list] == region_id)
+		membrane_indices = np.where(region_stack[membrane_list] == region_id)
+		#create Region object and add to cell
+		region = CellRegion(region_id, voxel_list[indices], membrane_list[membrane_indices], region_type)
+		cell.add_region(region)
 
 	
 def  get_composite(cell_dict, dim, max_number_cell = None):

@@ -6,8 +6,7 @@ The BrainbowUnit class
 
 import numpy as np
 cimport numpy as np
-from math import ceil, floor, log, sqrt, pi, exp
-from data.models.dataset import Dataset, Fluorset
+from data.models.dataset import Dataset,  Fluorset
 
 cdef class BrainbowUnit:
     '''
@@ -47,14 +46,15 @@ cdef class BrainbowUnit:
         single_neuron (boolean) : if True, labels a single random neuron in the dataset
         '''
 
-        if len(fluors) < 1:
-            return
+        assert(len(fluors) > 0, "Indicate at least one fluor")
+        assert(protein_density >= 0 labeling_density >= 0 and antibody_amplification_factor >= 0,\
+         "Protein density, labeling density and anitbody aamplication factor should be non negative")
         #Prepare data
         self.num_fluorophores += len(fluors)
         labeling_dict = {}
         cells = self.gt_dataset.get_all_cells()
 
-        if single_neuron: 
+        if single_neuron: #Select a single neuron
             cells = [cells[np.random.randint(0, len(cells))]]
             labeling_density = 1
 
@@ -66,9 +66,10 @@ cdef class BrainbowUnit:
             labeling_dict[cell.get_cell_id()] = cell.get_all_regions(region_type, membrane_only = membrane_only)
 
         self.perform_labeling(labeling_dict, fluors, protein_density, labeling_density, antibody_amplification_factor)
+        self.add_param(fluors, protein_density, antibody_amplification_factor, fluor_noise, region_type, membrane_only, single_neuron)
 
     
-    cpdef object perform_labeling(self, object labeling_dict, object fluors, float protein_density, int antibody_amplification_factor):
+    cpdef perform_labeling(self, object labeling_dict, object fluors, float protein_density, int antibody_amplification_factor):
         '''
         Performs the labeling, using a dictionary mapping cell_ids to their voxel list. Adds a new fluorophore volume to self.fluo_volumes.
         Helper function for label_cells
@@ -101,6 +102,7 @@ cdef class BrainbowUnit:
             locations = np.array(labeling_dict[neuron_list[n]], np.uint32)
             (X, Y, Z)= np.transpose(locations)
             probabilities = np.ones(X.size, np.float64) * 1.0/<float>X.size
+
             for k in range(num_fluorophores):
                 if infections[n, k] > 0:
                     num_proteins = np.random.poisson(<int>(self.protein_density * X.size * np.prod(voxel_dim)))
@@ -135,13 +137,24 @@ cdef class BrainbowUnit:
                         infect[i,j] = np.random.random_sample() < 0.5
         return infect
 
-    cpdef cdef np.ndarray[np.uint32_t, ndim=4] get_labeled_volume(self):
+    cpdef np.ndarray[np.uint32_t, ndim=4] get_labeled_volume(self):
         ''' Returns the labeled volume as a (fluorophore x X x Y x Z) numpy array, uint32 '''
 
-        return np.concatenate(self.fluo_volumes, 0)
+        volumes = np.concatenate(self.fluo_volumes, 0)
+        (num_channles, x, y, z) = volumes.shape
+        fluors = list(set([param['fluor'] for param in self.parameters]))
+        labeled_volume = np.zeros((len(fluors), x, y, z), np.uint32)
+
+        for i in range(len(fluors)):
+             #Find volumes of same fluorophore and merge them
+            for j in range(num_channles):
+                if self.parameters[j]['fluor'] == fluors[i]:
+                    labeled_volume[i, :, :, :] += volumes[j, :, :, :]
+
+        return labeled_volume
 
 
-    cpdef cdef np.ndarray[np.uint32_t, ndim=4] get_ground_truth(self, membrane_only = False):
+    cpdef np.ndarray[np.uint32_t, ndim=4] get_ground_truth(self, membrane_only = False):
          ''' 
          Returns the corresponding ground truth labeling as an (X x Y x Z) numpy array, uint32 
 
@@ -162,21 +175,45 @@ cdef class BrainbowUnit:
 
         return ground_truth
 
-    cpdef add_param(self, int num_fluorophores protein_density, labeling_density, antibody_amplification_factor, fluors, fluor_noise):
-        ''' Returns a dicitonary containing the parameters used by the labeling simulation ''' 
+    cpdef add_param(self, object fluors, float protein_density, float labeling_density,\
+      antibody_amplification_factor, float fluor_noise, object region_type, int membrane_only, int single_neuron):
+        ''' 
+        Adds a new set of parameters to the main parameter dictionary. 
+        Each fluorophore is marked with a set of parameters.
+         If label_cells is called multiple time with the same fluorophore, the parameters are appended.
 
-        params = {}
-        params['protein_density'] = self.protein_density 
-        params['labeling_density']  = self.labeling_density 
-        params['antibody_amplification_factor'] = self.antibody_amplification_factor 
-        params['fluor_types_used'] = self.fluor_types_used
-        params['num_fluorophores'] = self.num_fluorophores
-        params['fluor_noise'] = self.fluor_noise
-        return params
+        Arguments are the same as label_cells
+        ''' 
 
-    cpdef get_param_dict(self)
+        for fluor in fluors:
+            #Create param dict
+            params  = {}
+            params['protein_density'] = protein_density
+            params['labeling_density'] = labeling_density
+            params['antibody_amplification_factor'] = antibody_amplification_factor
+            params['fluor_noise'] = fluor_noise
+            params['region_type'] = region_type
+            params['membrane_only'] = membrane_only
+            params['single_neuron'] = single_neuron 
+            #Add to param list
+            self.parameters.append({'fluor' : fluor, 'params' : params})
 
-    cpdef get_type(self):
+    cpdef object get_param_dict(self):
+        ''' Returns a dictionary with the different parameters used throughout the labeling simulation '''
+
+        out = {}
+        for param_dict in self.parameters:
+            fluor = param_dict['fluor']
+            if out.has_key(fluor):
+                out[fluor] = {param : list(param_dict['params'][param]).append() for param in param_dict['params'].keys()}
+            else:
+                out[fluor] = param_dict['params']
+
+        return out
+
+    cpdef object get_type(self):
+        ''' Returns the type of the labeling unit, here Brainbow. '''
+
         return "Brainbow"
     
 

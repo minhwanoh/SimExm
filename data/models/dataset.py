@@ -7,7 +7,7 @@ the Fluorset interface to access the Fluorophore objects.
 '''
 import h5py
 import os.path
-from cell import Cell
+from cell import Cell, CellRegion
 import fluors as f
 
 
@@ -28,18 +28,20 @@ class Dataset:
 
         voxel_dim (1x3 int tuple) : the dimensions of a voxel in nm
         volume_dim (1x3 int tuple) : the dimensions of the whole dataset in voxel count
-
         '''
+
         self.cells = {}
         self.volume_dim = volume_dim
         self.voxel_dim = voxel_dim
             
     def get_voxel_dim(self):
         ''' Returns the dimensions of a voxel in a 1x3 tuple. Values are in nanometers '''
+
         return self.voxel_dim
 
      def get_volume_dim(self):
         ''' Returns the dimensions of the dataset in a 1x3 tuple. Values are in voxel count '''
+
         return self.volume_dim
 
     def add_cell(self, cell):
@@ -80,24 +82,50 @@ class Dataset:
         '''
 
         db = h5py.File(db_path, "r")
+        cells =  db.get('/cells')
         #Load attributes
         self.voxel_dim = db.attrs['voxel_dim']
         self.volume_dim = db.attrs['volume_dim']
         #Load cells
-        all_cells = db.get('/cells'):
-        for cell_id in all_cells:
-            cell = db.get('/cells/' + str(cell_id))
-            cell_object = Cell(cell_id,  cell.attrs['cell_type'])
-            full_region_object = CellRegion(np.array(cell['full'], np.uint32), np.array(cell['membrane'], np.uint32, region_type='full')
-            cell_object.add_region(full_region_object)
-            #Load regions
-            for region_type in db.get('/cells/regions'):
-                for region_id in db.get('/cells/regions/' + region_type):
-                    region = db.get('/cells/regions/' + region_type + '/' + str(region_id))
-                    region_object = CellRegion(np.array(region['full']), np.uint32), np.array(region['membrane'], np.uint32), region_type, region_id)
-                    cell_object.add_region(region_object)
-            
-            self.cells[str(cell_id)] = cell_object
+        for cell_id in cells:
+            self.load_cell(cells, cell_id)
+
+    def load_cell(self, cells, cell_id):
+        '''
+        Helper function to load_from_db, loads a cell into the dataset
+
+        cells : database object
+        cell_id : the id of the cell to load
+        '''
+
+        cell = cells.get(cell_id)
+        cell_object = Cell(cell_id,  cell.attrs['cell_type'])
+
+        #Load all regions
+        for region_type in cell:
+            self.load_region(cell, cell_object, region_type)
+        
+        self.cells[str(cell_id)] = cell_object
+
+    def load_region(self, cell, cell_object, region_type):
+        '''
+        Helper function to load_cell, loads all annotated cell regions into the dataset
+
+        cell : database object
+        cell_object (Cell) : Cell object from which to query the regions
+        region_type (string) : the type of cell region annotations to load
+        '''
+
+        region_type = cell.get(region_type)
+        for region_id in region_type:
+            #Get data
+            region = region_type.get(str(region_id))
+            voxels = np.array(region['full']), np.uint32)
+            membrane =  np.array(region['membrane'], np.uint32)
+            #Create Region object and add to cell
+            region_object = CellRegion(region_id, voxels, membrane, region_type)
+            cell_object.add_region(region_object)
+
 
     def save_to_db(self, db_path):
         '''
@@ -112,28 +140,41 @@ class Dataset:
         db.attrs['voxel_dim'] = self.voxel_dim
         db.create_group('/cells')
 
-        for cell in self.cells:
-            cell_id = db.create_group('/cells/' + str(cell.get_cell_id()))
-            cell_id.attrs['cell_type'] = cell.get_cell_type()
+        for cell_id in self.cells.keys():
+            cell_object = self.cells[cell_id]
+            self.save_cell(db, cell_object)
 
-            data_full = cell.get_full_cell()
-            full = self.db.create_dataset('/cells/' + str(cell.get_cell_id()) + '/full', data_full.shape)
-            full[...] = data_full
+    def save_cell(self, db, cell_object):
+        '''
+        Herlper function to save_to_db, save cell to the given db
 
-            data_membrane = cell.get_full_cell(membrane_only = True)
-            membrane = self.db.create_dataset('/cells/' + str(cell.get_cell_id()) + '/membrane', data_membrane.shape)
-            membrane[...] = data_membrane
+        db : database object
+        cell_object (Cell) : Cell object to save
+        '''
 
-            for region_type in cell.get_region_types():
-                db.create_dataset('/cells/regions/' + region_type)
-                for region_id in cell.get_all_region_ids_of_type(region_type):
-                    data_full_reg = cell.get_region(region_type, region_id)
-                    full_reg = self.db.create_dataset('/cells/regions/' + region_type + '/' + region_id + '/full', data_full_reg)
-                    full_reg[...] = data_full_reg
+        cell = db.create_group('/cells/' + str(cell.get_cell_id()))
+        cell.attrs['cell_type'] = cell_object.get_cell_type()
 
-                    data_membrane_reg = cell.get_region(region_type, region_id)
-                    membrane_reg = self.db.create_dataset('/cells/regions/' + region_type + '/' + region_id + '/membrane', data_membrane_reg.shape)
-                    membrane_reg[...] = data_membrane_reg
+        for region_type in cell_object.get_region_types():
+            self.save_region(cell, cell_object, region_type)
+
+    def save_region(self, cell, cell_object, region_type):
+        '''
+        Helper function to save_cell, save all regions of the given cell
+
+        cell : database object for the specific cell
+        cell_object (Cell) : Cell object to save
+        region_type (string) : the type of cell region annotations to save
+        '''
+
+        region_type = cell.create_group(region_type)
+        for region_id in cell_object.get_all_region_ids_of_type(region_type):
+            region = region_type.create_group(region_id)
+            voxels = cell_object.get_region(region_type, region_id, membrane_only = False)
+            membrane = cell_object.get_region(region_type, region_id, membrane_only = True)
+            region.create_dataset('full', data = voxels)
+            region.create_dataset('membrane', data = membrane)
+            
 
 
 class Fluoroset: 
@@ -162,6 +203,7 @@ class Fluoroset:
 
         name (string) : the name of the fluorophore to query
         '''
+
         all_fluors = get_all_fluorophores_types()
         index = [i.name == name for i in all_fluors].index(1)
         return all_fluors[index]

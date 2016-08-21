@@ -62,12 +62,9 @@ cpdef object run_simulation(object ds, int gt_dataset_id, object bounds, int z_o
 
     return images, images_gt
 
-def convert_params_to_string(object labeling_unit, object optical_unit):
-    labeling_params = labeling_unit.get_param_dict()
-    optics_params = optical_unit.get_param_dict()
-    parameters = {'labeling_params': labeling_params, 'optics_params': optics_params}
-    parameter_string = json.dumps(parameters)
-    return parameter_string
+cpdef compute_slices_required():
+    cdef int slices_required = <int> np.floor(8 * max(self.std_dev_z) + <float>(num_slices * self.focal_plane_depth) / <float> voxel_dims[2])
+        return slices_required
 
 
             

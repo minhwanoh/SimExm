@@ -1,40 +1,71 @@
 
 '''
-optics.pxd
+optics.pyx
 
-The OpticalUnit class
+The ConfocalUnit class
 '''
 
-import numpy as np
 import cython
-cimport cython
+import numpy as np
 cimport numpy as np
-import scipy.ndimage
-import scipy.misc
-import scipy.signal
 from math import log, sqrt, pi, exp, asin
-import database.methods.fluorophore as f
-from cython.parallel cimport prange, parallel
-from visualization.methods import make_gif
-
+from data.models.dataset import Fluorset
 
 ##################### OPTICS #####################
 
 cdef class ConfocalUnit:
-    def __cinit__(self, num_channels =3,  laser_wavelengths = [488, 565, 660], laser_power  = [50, 50, 50], \
-            laser_percentage   = [0.25, 0.25, 0.25], objective_back_aperture  = 1.0, baseline = [30,30,30],\
-        std_dev_baseline = [50, 50, 50], filters = [[450, 550], [550, 625], [625, 950]], exposure_time  = 0.1 ,\
-        numerical_aperture  = 1.15, objective_efficiency  = 0.8, detector_efficiency  = 0.6,\
-        focal_plane_depth  = 500, objective_factor  = 40.0, pixel_size = 6500, precision  = 1.0):
+    '''
+    The ConfocalUnit class. Implements the imaging section of the simulation by replicating a confocal microscope.
+    The unit takes a large set of parameters at initialization. It is necessary to call calculate_parameters to get the number of ground truth slices required.
+
+    The method resolve_volume can be called to image the output of the expansion unit. 
+    It creates a SimStack object (i.e data.models.sim) which can then be saved to the desired format.
+    '''
+
+    def __cinit__(self, num_channels = 3,  laser_wavelengths = [488, 565, 660], laser_power  = [50, 50, 50], \
+                    laser_percentage   = [0.25, 0.25, 0.25], objective_back_aperture  = 1.0, baseline = [30,30,30],\
+                    filters = [[450, 550], [550, 625], [625, 950]], exposure_time  = 0.1 ,\
+                    numerical_aperture  = 1.15, objective_efficiency  = 0.8, detector_efficiency  = 0.6,\
+                    focal_plane_depth  = 500, objective_factor  = 40.0, pixel_size = 6500):
+        '''
+        Sets the initial parameters of the confocal unit.
+
+        num_channels (int) : the number of channels to use
+        laser_wavelengths ([int]) : list of wavelenghts for the lasers in nm.
+        laser_power ([int]) : list of laser power values for each channel in milliWatts
+        laser_percentage [float] : value for each channel required (here 1x3 fraction)
+        objective_back_aperture (float) : in cm
+        baseline ([float]) : baseline number of photons added to the whole image (i.e as the mean of a poisson dist)
+        filters ([[int]] channel x 2) : 2 values per channel in nm
+        exposure_time (float) : in seconds
+        numerical_aperture (float) : the numerical aperture, needed to compute the convolutional kernel
+        objective_efficiency (float) : percentage of efficiency of the objecive, 0.0 to 1.0
+        detector_efficiency (float) : percentage of efficiency of the detector, 0.0 to 1.0
+        focal_plane_depth (int) : the thickness of a z-slice, in nm
+        objective_factor (float) : magnification factor of objective lens (20x, 40x, ...)
+        pixel_size (int) : the size of a pixel in nm
+        '''
+
+        assert(num_channels > 0, "Resolve at least one channel")
+
+        assert(num_channels == len(laser_wavelengths),\
+         "The number of channels " + str(num_channels) " and the number of parameters in laser_wavelengths " +str(len(laser_wavelengths)) " is different"))
+        assert(num_channels == len(laser_power),\
+         "The number of channels " + str(num_channels) " and the number of parameters in laser_power " +str(len(laser_power)) " is different"))
+        assert(num_channels == len(filters),\
+             "The number of channels " + str(num_channels) " and the number of parameters in filters " +str(len(filters)) " is different"))
+        assert(num_channels == len(baseline),\
+             "The number of channels " + str(num_channels) " and the number of parameters in baseline " +str(len(baseline)) " is different"))
+        assert(num_channels == len(laser_percentage),\
+             "The number of channels " + str(num_channels) " and the number of parameters in laser_percentage "  +str(len(laser_percentage)) " is different"))
 
         self.num_channels = num_channels
         self.laser_wavelengths = laser_wavelengths # [nm]
         self.laser_power  = laser_power # [milliWatts]
         self.laser_percentage   = laser_percentage# 1x3 fraction
         self.objective_back_aperture  = objective_back_aperture # [cm]
-        self.baseline = baseline# number of photons addew   qqd to everything
-        self.std_dev_baseline = baseline # standard deviation of baseline
-        self.filters = filters# [nm]
+        self.baseline = baseline # number of photons addew   qqd to everything
+        self.filters = filters # [nm]
         self.exposure_time  = exposure_time # [seconds]
         self.numerical_aperture  = numerical_aperture
         self.objective_efficiency  = objective_efficiency
@@ -43,21 +74,44 @@ cdef class ConfocalUnit:
         self.objective_factor  = objective_factor # magnification factor of objective lens
         self.pixel_size  = pixel_size # [nm] the width of each pixel
 
-        #assert((num_channels == length(laser_wavelengths)) and (num_channels == length(laser_intensities)) and (num_channels == filters_size(1)))
 
-    ''' Calculates remaining parameters '''
-    cpdef calculate_parameters(self, object voxel_dims, int num_slices):
+    cpdef calculate_parameters(self, object voxel_dims):
+        '''
+        Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
+
+        voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
+        '''
+
         self.laser_radius = self.objective_back_aperture / self.objective_factor
         self.laser_intensities = [(self.laser_power[i] * self.laser_percentage[i]) * 1.0 / (pi * (self.laser_radius) ** 2) for i in range(len(self.laser_power))]# [Watts / (m ^ 2)]
         self.scale_factor_xy  = voxel_dims[0] * self.objective_factor * self.precision / self.pixel_size
-        self.z_offset_step = <int>ceil(<float>self.focal_plane_depth / <float>voxel_dims[2])
+        self.z_offset_step = <int>np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[2])
         self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (4.44 * self.numerical_aperture * voxel_dims[0]) for i in range(len(self.laser_wavelengths))]
         self.std_dev_z  = [((1.037 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[2])  for i in range(len(self.laser_wavelengths))]
-        cdef int slices_required = <int> ceil(8 * max(self.std_dev_z) + <float>(num_slices * self.focal_plane_depth) / <float> voxel_dims[2])
-        return slices_required
+       
+
+    cpdef object resolve_volume(self, object volume, object volume_dims, object fluors):
+        ''' 
+        Main optics function, resolves fluorophore volume given the microscope parameters
+
+        volume (fluor x X x Y x Z tuple) : a representation of the fluorophore volume with locations of fluorophores in 3d as a tranposed matrix.
+        volume_dims ([int] 1 x 3) : size of the volume in each of its 3 dimensions, in number of voxels
+        fluors ([string]) : list of fluorophore corresponding to each channel in the volume. Can be obtained the the labeling parameter dictionary
+        ''' 
+
+        channels = []
+        for channel in range(self.num_channels):
+            fluo_volume = self.resolve_channel(volume, volume_dims, labeling_params.keys(), channel)
+            channels.append(fluo_volume)
+
+        #Stack channels
+        channels = np.stack(channels, axis = -1)
+        image_sequence = [channels[i, :, :] for i in range(channels.shape[0])]
+
+        return image_sequence
 
     ''' Main optics function, resolves fluorophore volume given the microscope parameters ''' 
-    cpdef np.ndarray[np.uint8_t, ndim=3] resolve_volume(self, object volume, object volume_dims, object all_fluor_types, int channel):
+    cpdef np.ndarray[np.uint8_t, ndim=3] resolve_channel(self, object volume, object volume_dims, object all_fluor_types, int channel):
 
         cdef int x, y, z, offset, i, start_index, end_index
         cdef np.ndarray[np.uint32_t, ndim = 1] mean_photons_per_fluor, photons

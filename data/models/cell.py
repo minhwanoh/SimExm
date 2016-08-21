@@ -19,7 +19,7 @@ class Cell:
     by taking edge pixels in each ground truth image.
     '''
    
-    def __init__(self, cell_id, voxels, membrane, cell_type = "Neuron"):
+    def __init__(self, cell_id, cell_type = "Neuron"):
       '''
       Initialize a cell object
 
@@ -29,9 +29,7 @@ class Cell:
 
       self.cell_id = cell_id
       self.cell_type = cell_type
-
       self.cell_regions = {}
-
     
     def set_cell_type(self, cell_type):
       ''' 
@@ -41,6 +39,16 @@ class Cell:
       '''
 
       self.cell_type = cell_type
+
+    def set_full_cell(self, voxels, membrane):
+      '''
+      Sets the main voxels covering the cell and its membrane. This should be done before loading any region annotation.
+
+      voxels (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell 
+      membrane (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell's membrane
+      '''
+      full_region = CellRegion(region_id = 1, voxels, membrane, region_type = 'full')
+      self.add_region(full_region)
 
     def get_cell_type(self):
       ''' Returns the cell type  of the cell '''
@@ -127,14 +135,14 @@ class CellRegion:
     '''
 
     
-    def __init__(self, voxels, membrane, region_type, region_id=1):
+    def __init__(self, region_id, region_type, voxels, membrane):
       '''
       Initalize CellRegion object, set attributes.
 
       region_id (int) : the id of the region object (taken from the ground truth to allow future reference)
-      voxels (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the whole cell
-      membrane (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the whole cell's membrane
       region_type (string) : the type of the region, could be synapse, dendrite, axon, soma, ...
+      voxels (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell region
+      membrane (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell region's membrane
       '''
       self.voxels = voxels
       self.membrane = membrane
