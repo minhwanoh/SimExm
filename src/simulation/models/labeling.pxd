@@ -6,7 +6,7 @@ The BrainbowUnit class
 
 import numpy as np
 cimport numpy as np
-from data.models.dataset import Dataset,  Fluorset
+from database.models.dataset import Dataset,  Fluorset
 
 cdef class BrainbowUnit:
     '''

@@ -8,8 +8,9 @@ The ConfocalUnit class
 import cython
 import numpy as np
 cimport numpy as np
-from math import log, sqrt, pi, exp, asin
-from data.models.dataset import Fluorset
+from math import pi
+from database.models.dataset import Fluorset
+from database.models.sim import SimStack
 
 ##################### OPTICS #####################
 
@@ -78,19 +79,20 @@ cdef class ConfocalUnit:
     cpdef calculate_parameters(self, object voxel_dims):
         '''
         Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
+        Gaussian approximation taken from "Gaussian Approximation offluorescence miscorcope point spread function models" by bo Zhang et al.
 
         voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
         '''
 
-        self.laser_radius = self.objective_back_aperture / self.objective_factor
+        self.laser_radius = <float> self.objective_back_aperture /  <float> self.objective_factor
         self.laser_intensities = [(self.laser_power[i] * self.laser_percentage[i]) * 1.0 / (pi * (self.laser_radius) ** 2) for i in range(len(self.laser_power))]# [Watts / (m ^ 2)]
-        self.scale_factor_xy  = voxel_dims[0] * self.objective_factor * self.precision / self.pixel_size
-        self.z_offset_step = <int>np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[2])
-        self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (4.44 * self.numerical_aperture * voxel_dims[0]) for i in range(len(self.laser_wavelengths))]
-        self.std_dev_z  = [((1.037 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[2])  for i in range(len(self.laser_wavelengths))]
+        self.scale_factor_xy  = <float> (voxel_dims[0] * self.objective_factor)  / <float> self.pixel_size
+        self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[2])
+        self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (2 * pi * self.numerical_aperture * voxel_dims[0]) for i in range(len(self.laser_wavelengths))]
+        self.std_dev_z  = [((0.78 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[2])  for i in range(len(self.laser_wavelengths))] #1.037
        
 
-    cpdef object resolve_volume(self, object volume, object volume_dims, object fluors):
+    cpdef object resolve_volume(self, object volume, object volume_gt, object volume_dims, object fluors):
         ''' 
         Main optics function, resolves fluorophore volume given the microscope parameters
 
@@ -105,20 +107,36 @@ cdef class ConfocalUnit:
             channels.append(fluo_volume)
 
         #Stack channels
-        channels = np.stack(channels, axis = -1)
-        image_sequence = [channels[i, :, :] for i in range(channels.shape[0])]
+        images = np.stack(channels, axis = -1)
 
-        return image_sequence
+        #Get ground truth
+        ground_truth =  self.resolve_ground_truth(volume_gt, volume_dims)
 
-    ''' Main optics function, resolves fluorophore volume given the microscope parameters ''' 
+        #Create SimStack
+        sim_stack = SimStack(images, ground_truth)
+
+        return sim_stack
+
+
     cpdef np.ndarray[np.uint8_t, ndim=3] resolve_channel(self, object volume, object volume_dims, object all_fluor_types, int channel):
+        '''
+        Resolves the given channel. Itterates over the fluorophores in the volume, computes the emitted photons, and detected photons per pixel.
+        Outputs a normalized volume of n slices, where n is the number of slices requested by the user at ground truth loading time.
+
+        volume (tuple(fluors, X, Y, Z)) : tranposed matrix of the fluorophore volume, with expanded coordinates
+        volume_dims (int tuple) : size of the volume in voxels per dimension. Since the volume is tranposed above,  helps  figure out how to place the data in the volume
+        all_fluor_types : the fluorophores used in labeling (order should correspond to the order of fluors in volume[0])
+        channel (int) : the channel to resolve 
+        '''
 
         cdef int x, y, z, offset, i, start_index, end_index
         cdef np.ndarray[np.uint32_t, ndim = 1] mean_photons_per_fluor, photons
         cdef np.ndarray[np.float64_t, ndim = 3] non_normalized_volume
         cdef np.ndarray[np.uint8_t, ndim=3] normalized_volume
         
+        # Load transposed volume
         (num_fluors_per_channel, X, Y, Z) = volume
+        num_fluors_per_channel = np.array(num_fluors_per_channel, np.uint32)
 
         #Perform magnification
         x = np.ceil(volume_dims[0] * self.scale_factor_xy)
@@ -128,14 +146,14 @@ cdef class ConfocalUnit:
 
         #Get initial photon counts
         mean_photons_per_fluor = self.get_mean_number_photons_per_fluor(all_fluor_types, channel)
-        photons = self.get_photon_count(np.array(num_fluors_per_channel, np.uint32), mean_photons_per_fluor)
+        photons = self.get_photon_count(num_fluors_per_channel, mean_photons_per_fluor)
 
-        #Resolve slices 1 by 1
         i = 0
-        start_index = int(ceil(4 * max(self.std_dev_z)))
-        end_index = int(floor(volume_dims[2] - 4 * max(self.std_dev_z)))
-        non_normalized_volume = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.float64)
+        start_index = np.ceil(4 * max(self.std_dev_z)) # We start with an offset of 4 times the maximum z-std
+        end_index = np.floor(volume_dims[2] - 4 * max(self.std_dev_z)) # End with the same offset
+        non_normalized_volume = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.float64) #Create empty volume
 
+        #Populate volume
         for offset in range(start_index, end_index, self.z_offset_step):
             non_normalized_volume[i,:,:] = self.resolve_slice(X, Y, Z, photons, (x,y), offset, channel)
             i = i + 1
@@ -143,24 +161,33 @@ cdef class ConfocalUnit:
         #Normalize
         normalized_volume = self.normalize(non_normalized_volume)
 
-        return normalized_volume
-
-    ''' Creates the corresponding ground truth volume '''
+        return normalized_volumed
+ 
     cpdef np.ndarray[np.uint32_t, ndim = 3] resolve_ground_truth(self, object volume_gt, object volume_dims):
+        '''
+        Generates the ground truth volume corresponding to the unit's parameters.
+        The method is called from resolve_volume but may be use on its own by giving it the fluorophore ground truth volume and dimension
+
+        volume (tuple(X, Y, Z)) : tranposed matrix of the ground truth volume, with expanded coordinates
+        volume_dims (int tuple) : size of the volume in voxels per dimension. Since the volume is tranposed above, helps figure out how to place the data in the volume
+        '''
 
         cdef int z_low, z_high, x, y, z, i
         (values, X, Y, Z) = volume_gt
-        #Perform magnification
-        x = ceil(ceil(volume_dims[0] * self.scale_factor_xy) * (1.0 / self.precision))
-        y = ceil(ceil(volume_dims[1] * self.scale_factor_xy) * (1.0 / self.precision))
-        X = np.floor(np.floor(self.scale_factor_xy * X) * (1.0 / self.precision)).astype(np.int64)
-        Y = np.floor(np.floor(self.scale_factor_xy * Y) * (1.0 / self.precision)).astype(np.int64)
-        #Create ground truth volume
 
+        #Perform magnification
+        x = np.ceil(volume_dims[0] * self.scale_factor_xy)
+        y = np.ceil(volume_dims[1] * self.scale_factor_xy)
+        X = np.floor(self.scale_factor_xy * X).astype(np.int64)
+        Y = np.floor(self.scale_factor_xy * Y).astype(np.int64)
+
+        #Create ground truth volume
         i = 0
-        start_index = int(ceil(4 * max(self.std_dev_z)))
-        end_index = int(floor(volume_dims[2] - 4 * max(self.std_dev_z)))
+        start_index = np.ceil(4 * max(self.std_dev_z))
+        end_index = np.floor(volume_dims[2] - 4 * max(self.std_dev_z))
         cdef np.ndarray[np.uint32_t, ndim = 3] ground_truth = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.uint32)
+
+        #Populate volume
         for offset in range(start_index, end_index, self.z_offset_step):
             z_low = np.searchsorted(Z, offset, side = 'left')
             z_high = np.searchsorted(Z, Z[z_low], side = 'right') - 1
@@ -169,9 +196,18 @@ cdef class ConfocalUnit:
 
         return ground_truth
 
-
-    ''' Resolves the slice optically, given the number and type of fluoropores per voxel'''
     cpdef np.ndarray[np.float64_t, ndim=2] resolve_slice(self, object X, object Y, object Z, object photons, object dims, int offset, int channel):
+        ''' 
+        Resolves a slice optically, given a list of fluorophore locations in the desired bound of 4 x std.
+
+        X ([int]) : list of locations along the x-axis of the photons
+        Y ([int]) : list of locations along the y-axis of the photons
+        Z ([int]) : list of locations along the z-axis of the photons
+        photons ([int]) : number of photon per location
+        dims (tuple (x, y)), the size of the slice to create
+        offset (int) : the z -offset where to project the fluorohore's emitted photons
+        channel (int) : the channel to resolve
+        '''
 
         cdef int z_low, z_high, x , y
         cdef np.ndarray[np.float64_t, ndim = 2] non_normalized
@@ -179,16 +215,21 @@ cdef class ConfocalUnit:
         (x, y) = (dims[0], dims[1])
         z_low = np.searchsorted(Z, offset - 4 * self.std_dev_z[channel],  side = 'left')
         z_high = np.searchsorted(Z, offset + 4 * self.std_dev_z[channel], side = 'right')
-        non_normalized = self.project_photons(X[z_low: z_high], Y[z_low: z_high], Z[z_low: z_high],\
-         photons[z_low: z_high], offset, channel, (x, y))
+        non_normalized = self.project_photons(X[z_low: z_high], Y[z_low: z_high], Z[z_low: z_high], photons[z_low: z_high], offset, channel, (x, y))
 
         #Resolve
         non_normalized = np.add(non_normalized, self.get_baseline_image(non_normalized.shape[0], non_normalized.shape[1], channel))
 
         return non_normalized
 
-    ''' Calculates the number of photons per fluor for a given channel and returns a 1D array of length len(fluors) '''
     cdef np.ndarray[np.uint32_t, ndim=1] get_mean_number_photons_per_fluor(self, object fluors, int channel):
+        '''
+        Calculates the number of photons per fluor for a given channel and returns a 1D array of length len(fluors)
+
+        fluors ([string]) : list of fluorophore names
+        channel (int) :  the channel to compute the photon count on
+        '''
+
         cdef int i, emitted_photons, detected_photons
         cdef int num_channels = len(fluors)
         cdef np.ndarray[np.uint32_t, ndim=1] mean_detected_photons = np.zeros(num_channels, np.uint32)
@@ -200,28 +241,51 @@ cdef class ConfocalUnit:
 
         return mean_detected_photons
 
-    ''' Returns the number of emitted photons given a fluor and the channel '''
     cdef int get_emitted_photons(self, object fluor, int channel):
-        cdef float quantum_yield = f.get_quantum_yield(self.ds, fluor)
-        cdef float extinction_coefficient = f.get_extinction_coefficient(self.ds, fluor)
-        cdef float excitation = f.find_excitation(self.ds, fluor, self.laser_wavelengths[channel])
+        ''' 
+        Returns the number of emitted photons given a fluor and the channel
+
+        fluor (string) : the fluorophore to query 
+        channel (int) : calculate the number photons given this channel
+        '''
+
+        fluorset = Fluorset()
+        f = fluorset.get_fluor(fluor)
+        cdef float quantum_yield = f.get_quantum_yield()
+        cdef float extinction_coefficient = f.get_extinction_coefficient()
+        cdef float excitation = f.find_excitation(self.laser_wavelengths[channel])
         cdef float CONSTANT = 0.119626566 # in m^3 * kg * s^{-1} Avogadro's number * Planck's constant * speed of light
         cdef float photons = excitation * quantum_yield * (extinction_coefficient * 100) * self.exposure_time\
          * self.laser_intensities[channel] * (self.laser_wavelengths[channel] * 1e-9) / (1000 * CONSTANT)
 
         return <int>(ceil(photons))
 
-    ''' Returns the number of detected photons given the fluor and the number of emitted_photons '''
     cdef int get_detected_photons(self, object fluor, int emitted_photons, int channel):
+        '''
+        Returns the number of detected photons given the fluor and the number of emitted_photons
+
+        fluor (string) : the fluorophore to query 
+        emitted_photons (int) : the number of emitted photons
+        channel (int) : calculate the number photons given this channel
+        '''
+
+        fluorset = Fluorset()
+        f = fluorset.get_fluor(fluor)
+
         cdef float wavelength_min = self.filters[channel][0]
         cdef float wavelength_max = self.filters[channel][1]
-        cdef float emission = f.find_emission(self.ds, fluor, wavelength_min, wavelength_max)
+        cdef float emission = f.find_emission(wavelength_min, wavelength_max)
         cdef float detected_photons = emitted_photons * emission * self.objective_efficiency * self.detector_efficiency
         return <int>(ceil(detected_photons))
 
-    ''' Takes a list of fluorophore locations and the number per type of fluor, and returns the photon count for each of these locations'''
     cdef np.ndarray[np.uint32_t, ndim = 1] get_photon_count(self, np.ndarray[np.uint32_t, ndim=2] num_fluors_per_channel,\
      np.ndarray[np.uint32_t, ndim=1] mean_detected_photons):
+        '''
+        Takes a list of fluorophore locations and the number per type of fluor, and returns the photon count for each of these locations
+
+        num_fluors_per_channel (numpy fluors x voxels) : number of fluors of a certin type per location
+        mean_detected photons (numpy uint32 array) : number of photons detected for each fluorophore
+        '''
 
         #Initialize with baseline
         cdef int num_voxels = num_fluors_per_channel.shape[1]
@@ -236,25 +300,51 @@ cdef class ConfocalUnit:
 
         return photons
 
-    ''' Get baseline image for initial photon count '''
     cdef np.ndarray[np.float64_t, ndim=2] get_baseline_image(self, int x, int y, int channel):
+        ''' 
+        Get baseline image for initial photon count
+
+        x (int) : width of the baseline image
+        y (int) : height of the baseline image
+        channel (int) : the channel on which to base to baseline value
+        '''
+
         cdef np.ndarray[np.float64_t, ndim=2] psf = self.get_2dgaussian_kernel(x, y, <float> x / 2.0, <float> y / 2.0) 
         return np.multiply(self.std_dev_baseline[channel] * np.random.uniform(0.2, 0.8, size=(x, y)) + self.baseline[channel], psf)
 
-    ''' Creates point spread image with maximum magnitude 1 '''
     cdef np.ndarray[np.float64_t, ndim=2] get_2dgaussian_kernel(self, int x, int y, float sigma_x, float sigma_y):
+        '''
+        Creates point spread image with maximum magnitude 1
+
+        x (int) : width of the kernel 
+        y (int) : height of the kernel
+        sigma_x (float) : x-std of the kernel
+        sigma_y (float) : y-std of the kernel
+        '''
         cdef float x_0 = <float>x / 2.0
         cdef float y_0 = <float>y / 2.0
         cdef np.ndarray[np.float64_t, ndim=3] indices = np.indices((x, y), dtype=np.float64)
         cdef np.ndarray[np.float64_t, ndim=2] gaussian = np.exp(-((indices[0] - x_0)**2 / (2* sigma_x ** 2) + (indices[1] - y_0)**2 / (2* sigma_y ** 2)))
         return gaussian
 
-    ''' Creates point spread image with maximum magnitude 1'''
     cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self, float sigma_x, float sigma_y, float sigma_z, int channel):
+        '''
+        Creates point spread image with maximum magnitude 1
+
+        Computes the 3d convolution kernel (point spread function of the micriscope). The std_values are used to bound the kernel toa size that 
+        allows to reach up to 4 times the std away from the center. Here only half is taken is z for quicker computation.
+
+        sigma_x (float) : x-std of the kernel
+        sigma_y (float) : y-std of the kernel
+        sigma_z (float) : z-std of the kernel
+        channel (int) : the channel to build the kernel based on
+        '''
+
         cdef float x_0, y_0, z_0, w_0, z_r, size_z, size_r
         cdef int x, y, z, k
         cdef np.ndarray[np.float64_t, ndim=4] indices
         cdef np.ndarray[np.float64_t, ndim=3] kernel, w_z
+
         size_r = <float> self.pixel_size / <float>self.objective_factor
         size_z = ceil(<float> self.focal_plane_depth / <float> self.z_offset_step)
         (x, y, z) = (8 * ceil(sigma_x) , 8 * ceil(sigma_y) , 4 * ceil(sigma_z))
@@ -263,13 +353,25 @@ cdef class ConfocalUnit:
         w_0 =  <float>self.laser_wavelengths[channel] / (<float> pi * self.numerical_aperture)
         z_r = pi * ((w_0)**2) / <float>self.laser_wavelengths[channel]
         w_z = (w_0) * np.sqrt(1 + (size_z * (indices[0] - z_0) / z_r)**2)
-        kernel = (w_0) / (w_z) * np.exp(-((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
+        kernel = (((w_0) / (w_z))**2) * np.exp(- 2 * ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
+
         return kernel
 
-    ''' Projects the given list of photons on the slice '''
     @cython.boundscheck(False)
-    cdef np.ndarray[np.float64_t, ndim=2] project_photons(self, long[:] X,\
-      long[:] Y, long[:] Z, unsigned int[:] photons, int z_offset, int channel, object dims):
+    cdef np.ndarray[np.float64_t, ndim=2] project_photons(self,  long[:] X, long[:] Y, long[:] Z, unsigned int[:] photons, int z_offset, int channel, object dims):
+        ''' 
+        Projects the given list of photons on the slice. Uses cython memory views, and can be parallelized if the module is compiled with -fopenmp
+        Avoid doing a convolution in a sparse volume by doing parallel photon projection
+        
+        X ([int]) : memory view, list of locations along the x-axis
+        Y ([int]) : memory view, list of locations along the y-axis
+        Z ([int]) : memory view, list of locations along the z-axis
+        photons ([int]) : memory view, list of photon counts
+        offset (int) : the z-offset onto which to project the photons (by taking a slice of the psf)
+        channel (int) : the channel to work on
+        dim (tuple int) : dimension of the image
+        '''
+
         cdef long i, index, length, x, y, z, index_x, index_y
         cdef np.ndarray[np.float64_t, ndim=3] kernel = self.get_convolutional_kernel(self.std_dev_xy[channel], self.std_dev_xy[channel], self.std_dev_z[channel], channel)
         cdef double[:,:] photon_slice = np.pad(np.zeros(dims, np.float64), (kernel.shape[1] / 2,), mode ='constant', constant_values = 0)  
@@ -285,15 +387,24 @@ cdef class ConfocalUnit:
                         photon_slice[index_x, index_y] += kernel[z, x, y] * photons[i]
         return np.array(photon_slice[kernel.shape[1] / 2: - kernel.shape[1] / 2, kernel.shape[2] / 2: - kernel.shape[2] / 2], np.float64)
 
-    ''' Normalize array and convert to uint8 '''
+    
     cdef np.ndarray[np.uint8_t, ndim=3] normalize(self, np.ndarray[np.float64_t, ndim=3] non_normalized):
+        '''
+        Normalize array by dividing by maximum and convert to uint8
+
+        non_normalized (numpy X x Y x Z float) : the non_normalized volume of photons
+        '''
+
         cdef float the_max = max(<float> np.amax(non_normalized), 1)
         cdef np.ndarray[np.float64_t, ndim=3] normalized = non_normalized * (255.0 / the_max)
         return np.array(np.floor(normalized), np.uint8)
 
-    ''' Returns a dicitonary containing the parameters used by the optical simulation '''
+
     cpdef object get_param_dict(self):
+        ''' Returns a dicitonary containing the parameters used by the optical simulation '''
+
         params = {}
+        params['num_channels'] = self.num_channels # number of channles in the optical unit
         params['laser_wavelengths'] = self.laser_wavelengths # [nm]
         params['laser_power'] = self.laser_power # [milliWatts]
         params['laser_percentage']   = self.laser_percentage# 1x3 fraction
@@ -308,8 +419,10 @@ cdef class ConfocalUnit:
         params['focal_plane_depth']  = self.focal_plane_depth # [nm] thickness of each focus plane
         params['objective_factor']  = self.objective_factor # magnification factor of objective lens
         params['pixel_size']  = self.pixel_size # [nm] the width of each pixel
-        params['precision']  = self.precision # internal parameter used in blurring)
+
         return params
 
     cpdef object get_type(self):
+        ''' Returns the type of the optical unit '''
+        
         return "Confocal"

@@ -14,7 +14,7 @@ class SimStack:
     Handles simulation outputs. Saves to gif, image_sequence (png) or tiff stack.
     '''
 
-    def __init__(self, image_sequence, ground_truth, num_channels):
+    def __init__(self, image_volume, ground_truth, num_channels):
         '''
         Init method, set attributes.
 
@@ -22,7 +22,8 @@ class SimStack:
         num_channels (int) : the number of channels in each image
         '''
 
-        self.image_sequence = image_sequence
+        self.image_sequence = [image_volume[i, :, :, :] for i in range(image_volume.shape[0])]
+        self.ground_truth = [ground_truth[i, :, :] for i in range(ground_truth.shape[0])]
         self.num_channels = num_channels
 
         if self.num_channels < 3:
