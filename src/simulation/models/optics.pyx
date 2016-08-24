@@ -9,8 +9,7 @@ import cython
 import numpy as np
 cimport numpy as np
 from math import pi
-from database.models.dataset import Fluorset
-from database.models.sim import SimStack
+from src.database.models.dataset import Fluorset
 
 ##################### OPTICS #####################
 
@@ -49,16 +48,16 @@ cdef class ConfocalUnit:
 
         assert(num_channels > 0, "Resolve at least one channel")
 
-        assert(num_channels == len(laser_wavelengths),\
-         "The number of channels " + str(num_channels) " and the number of parameters in laser_wavelengths " +str(len(laser_wavelengths)) " is different"))
-        assert(num_channels == len(laser_power),\
-         "The number of channels " + str(num_channels) " and the number of parameters in laser_power " +str(len(laser_power)) " is different"))
-        assert(num_channels == len(filters),\
-             "The number of channels " + str(num_channels) " and the number of parameters in filters " +str(len(filters)) " is different"))
-        assert(num_channels == len(baseline),\
-             "The number of channels " + str(num_channels) " and the number of parameters in baseline " +str(len(baseline)) " is different"))
-        assert(num_channels == len(laser_percentage),\
-             "The number of channels " + str(num_channels) " and the number of parameters in laser_percentage "  +str(len(laser_percentage)) " is different"))
+        assert(num_channels <= len(laser_wavelengths),\
+         "The number of channels " + str(num_channels) " is larger than the number of parameters in laser_wavelengths " +str(len(laser_wavelengths)))
+        assert(num_channels <= len(laser_power),\
+         "The number of channels " + str(num_channels) " is larger than the number of parameters in laser_power " +str(len(laser_power))
+        assert(num_channels <= len(filters),\
+             "The number of channels " + str(num_channels) " is larger than the number of parameters in filters " +str(len(filters)))
+        assert(num_channels <= len(baseline),\
+             "The number of channels " + str(num_channels) " is larger than the number of parameters in baseline " +str(len(baseline)))
+        assert(num_channels <= len(laser_percentage),\
+             "The number of channels " + str(num_channels) " is larger than the number of parameters in laser_percentage "  +str(len(laser_percentage)))
 
         self.num_channels = num_channels
         self.laser_wavelengths = laser_wavelengths # [nm]
@@ -75,24 +74,32 @@ cdef class ConfocalUnit:
         self.objective_factor  = objective_factor # magnification factor of objective lens
         self.pixel_size  = pixel_size # [nm] the width of each pixel
 
+        self.laser_radius = <float> self.objective_back_aperture /  <float> self.objective_factor
+        self.laser_intensities = [(self.laser_power[i] * self.laser_percentage[i]) * 1.0 / (pi * (self.laser_radius) ** 2) for i in range(len(self.laser_power))]# [Watts / (m ^ 2)]
+ 
 
-    cpdef calculate_parameters(self, object voxel_dims):
+
+    cpdef object compute_parameters(self, object voxel_dims, int expansion_factor, object bounds_wanted):
         '''
         Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
         Gaussian approximation taken from "Gaussian Approximation offluorescence miscorcope point spread function models" by bo Zhang et al.
 
         voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
+        expansion_facotr (int) : the expansion factor used in the simulation
+        bounds_wanted (tuple (x, y, z) int) : the desired width, height, and depth for the sim output
         '''
 
-        self.laser_radius = <float> self.objective_back_aperture /  <float> self.objective_factor
-        self.laser_intensities = [(self.laser_power[i] * self.laser_percentage[i]) * 1.0 / (pi * (self.laser_radius) ** 2) for i in range(len(self.laser_power))]# [Watts / (m ^ 2)]
         self.scale_factor_xy  = <float> (voxel_dims[0] * self.objective_factor)  / <float> self.pixel_size
         self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[2])
         self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (2 * pi * self.numerical_aperture * voxel_dims[0]) for i in range(len(self.laser_wavelengths))]
         self.std_dev_z  = [((0.78 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[2])  for i in range(len(self.laser_wavelengths))] #1.037
-       
+        cdef int depth_required = np.floor(8 * max(self.std_dev_z) + <float>(num_slices * self.focal_plane_depth) / <float> (voxel_dims[2] * expansion_factor))
+        cdef int width_required = np.floor(bounds_wanted[0] * 1 / (self.scale_factor_xy * expansion_factor))
+        cdef int height_required = np.floor(bounds_wanted[1] * 1 / (self.scale_factor_xy * expansion_factor))
+        
+        return (width_required, height_required, depth_required)
 
-    cpdef object resolve_volume(self, object volume, object volume_gt, object volume_dims, object fluors):
+    cpdef object resolve_volume(self, object volume, object volume_dims, object fluors):
         ''' 
         Main optics function, resolves fluorophore volume given the microscope parameters
 
@@ -109,13 +116,7 @@ cdef class ConfocalUnit:
         #Stack channels
         images = np.stack(channels, axis = -1)
 
-        #Get ground truth
-        ground_truth =  self.resolve_ground_truth(volume_gt, volume_dims)
-
-        #Create SimStack
-        sim_stack = SimStack(images, ground_truth)
-
-        return sim_stack
+        return images
 
 
     cpdef np.ndarray[np.uint8_t, ndim=3] resolve_channel(self, object volume, object volume_dims, object all_fluor_types, int channel):
@@ -400,10 +401,11 @@ cdef class ConfocalUnit:
         return np.array(np.floor(normalized), np.uint8)
 
 
-    cpdef object get_param_dict(self):
+    cpdef object get_parameters(self):
         ''' Returns a dicitonary containing the parameters used by the optical simulation '''
 
         params = {}
+        params['unit_type'] = self.get_type()
         params['num_channels'] = self.num_channels # number of channles in the optical unit
         params['laser_wavelengths'] = self.laser_wavelengths # [nm]
         params['laser_power'] = self.laser_power # [milliWatts]
@@ -424,5 +426,5 @@ cdef class ConfocalUnit:
 
     cpdef object get_type(self):
         ''' Returns the type of the optical unit '''
-        
+
         return "Confocal"

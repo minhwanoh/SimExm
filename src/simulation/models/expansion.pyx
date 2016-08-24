@@ -16,7 +16,7 @@ cdef class ExpansionUnit:
 
     '''
 
-    def __cinit__(self, int expansion_factor):
+    def __cinit__(self, expansion_factor):
         ''' 
         Init method, sets attributes 
 
@@ -25,7 +25,12 @@ cdef class ExpansionUnit:
 
         self.expansion_factor = expansion_factor 
 
-    cpdef object perform_expansion(np.ndarray[np.uint32_t, ndim=4] fluo_volume):
+    cpdef int get_expansion_factor(self):
+        ''' Returns the expansion factor of the unit '''
+
+        return self.expansion_factor
+
+    cpdef object expand_volume(self, np.ndarray[np.uint32_t, ndim=4] fluo_volume):
         ''' 
         Performs expansion of volume in all directions, padding wiht 0s 
 
@@ -41,7 +46,7 @@ cdef class ExpansionUnit:
         indices = np.argsort(newZ)
         return (number_per_fluor[:,indices], newX[indices], newY[indices], newZ[indices])
 
-    cpdef object perform_expansion_gt(np.ndarray[np.uint32_t, ndim=3] fluo_gt_volume):
+    cpdef object expand_ground_truth(self, np.ndarray[np.uint32_t, ndim=3] fluo_gt_volume):
         ''' 
         Performs expansion of the groudn truth volume in all directions, padding wiht 0s 
 
@@ -57,7 +62,7 @@ cdef class ExpansionUnit:
         
         return (values[indices], newX[indices], newY[indices], newZ[indices])
 
-    cpdef object get_param_dict(self):
+    cpdef object get_parameters(self):
         ''' Returns dictionary containing the expansion parameters '''
         
         return { 'expansion_factor' : self.expansion_factor }

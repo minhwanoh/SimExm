@@ -14,17 +14,19 @@ class SimStack:
     Handles simulation outputs. Saves to gif, image_sequence (png) or tiff stack.
     '''
 
-    def __init__(self, image_volume, ground_truth, num_channels):
+    def __init__(self, image_volume, ground_truth, sim_params):
         '''
         Init method, set attributes.
 
-        image_sequence : list of numpy X x Y x C, uint8 arrays
-        num_channels (int) : the number of channels in each image
+        image_volume (numpy Z x X x Y x C volume, uint8)  : the  simulation output
+        ground_truth (numpy Z x X x Y, uint32 ) : the simulation ground truth output
+        sim_params (SimParams) : an instance of the SimParams class, which helps deal with parameter file
         '''
 
         self.image_sequence = [image_volume[i, :, :, :] for i in range(image_volume.shape[0])]
         self.ground_truth = [ground_truth[i, :, :] for i in range(ground_truth.shape[0])]
-        self.num_channels = num_channels
+        self.num_channels = self.image_sequence[0].shape[2]
+        self.sim_params = sim_params
 
         if self.num_channels < 3:
             self.add_empty_channel(num = 3 - self.num_channels)
@@ -55,6 +57,7 @@ class SimStack:
             path += "/"
         writeGif(path + name + ".gif", self.image_sequence, duration=0.5)
         writeGif(path + name + "_gt.gif", self.ground_truth, duration=0.5)
+        self.sim_params.save(path, name + "_params")
 
     def save_as_image_sequence(path, name):
         '''
@@ -71,8 +74,9 @@ class SimStack:
             gt = Image.fromarray(self.ground_truth[i], 'L')
             im.save(path + name + "/" + "image_" + str(i) + ".png")
             gt.save(path + name + "_gt/" + "image_" + str(i) + ".png")
+        self.sim_params.save(path, name + "_params")
 
-    def save_as_tiff_stack(path, name, sixteen_bit_mode = False):
+    def save_as_tiff(path, name, sixteen_bit_mode = False):
         '''
         Save image sequence as multi-page tiff stack
 
@@ -86,28 +90,33 @@ class SimStack:
         else:
             imsave(path + name + ".tif", np.array(image_sequence, np.uint8))
         imsave(path + name + "_gt.tif", np.array(image_sequence, np.float32))
+        self.sim_params.save(path, name + "_params")
 
 
-class SimParam:
+class SimParams:
 
     '''
     A class to store simulation parameters
     '''
 
-    def __init__(self, labeling_params, optical_params, expansion_params):
+    def __init__(self, volume_dim, gt_params, labeling_params, expansion_params, optics_params):
         '''
         Init method, set attributes
-
+            
+        volume_dim (tuple (x, y, z ) int): the size of the output sim
+        gt_params (dict) : dictionary from parameter to value
         labeling_params (dict) : dictionary from parameter to value
-        optical_params (dict) : dictionary from parameter to value
+        optics_params (dict) : dictionary from parameter to value
         expansion_params (dict) : dictionary from parameter to value
         '''
 
-        self.labeling_params = labeling_params
-        self.optical_params = optical_params
+        self.volume_dim = volume_dim
+        self.gt_params = gt_params
+        self.labeling_params = labeling_unit
+        self.optics_params = optics_params
         self.expansion_params = expansion_params
 
-    def save_param(self, path, name):
+    def save(self, path, name):
 
         '''
         Save image sequence as multi-page tiff stack
@@ -118,9 +127,18 @@ class SimParam:
 
         if path[-1] != "/": path += "/"
 
-        labeling_params = labeling_unit.get_param_dict()
-        optics_params = optical_unit.get_param_dict()
-        parameters = {'labeling_params': self.labeling_params, 'optics_params': self.optics_params, 'expansion_params' = self.expansion_params}
+        pre_expansion_space_voxel_dim = self.optics_params['pixel_size'] / self.optics_params['objective_factor'] 
+        post_expansion_space_voxel_dim = pre_expansion_space_voxel_dim / self.expansion_params['expansion_factor']
+
+        total_gt_size = [self.gt_params['volume_dim'][i] * self.gt_params['voxel_dim'][i] for i in range(3)]
+        total_sim_size_pre = [self.volume_dim[i] * pre_expansion_space_voxel_dim[i] for i in range(3)]
+        total_sim_size_post = [self.volume_dim[i] * post_expansion_space_voxel_dim[i] for i in range(3)]
+
+        parameters = { 'volume_dim' : self.volume_dim, \
+                    'ground_truth' : self.gt_params, 'labeling' : self.labeling_params, 'optics': self.optics_params, 'expansion' = self.expansion_params, \
+                    'pre_expansion_space_voxel_dim' : pre_expansion_space_voxel_dim, 'post_expansion_space_voxel_dim' : post_expansion_space_voxel_dim,
+                    'total_ground_truth_size' : total_gt_size, 'total_sim_size_pre_exp_space' : total_sim_size_pre, 'total_sim_size_posT_exp_space' : total_sim_size_post\
+                    }
         with open(path + name + '.txt', 'w') as f:
             json.dump(parameters, f)
 

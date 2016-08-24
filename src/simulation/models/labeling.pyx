@@ -6,7 +6,7 @@ The BrainbowUnit class
 
 import numpy as np
 cimport numpy as np
-from data.models.dataset import Dataset,  Fluorset
+from src.database.models.dataset import Fluorset
 
 cdef class BrainbowUnit:
     '''
@@ -188,6 +188,7 @@ cdef class BrainbowUnit:
         for fluor in fluors:
             #Create param dict
             params  = {}
+            params['unit_type'] = self.get_type()
             params['protein_density'] = protein_density
             params['labeling_density'] = labeling_density
             params['antibody_amplification_factor'] = antibody_amplification_factor
@@ -198,7 +199,7 @@ cdef class BrainbowUnit:
             #Add to param list
             self.parameters.append({'fluor' : fluor, 'params' : params})
 
-    cpdef object get_param_dict(self):
+    cpdef object get_parameters(self):
         ''' Returns a dictionary with the different parameters used throughout the labeling simulation '''
 
         out = {}

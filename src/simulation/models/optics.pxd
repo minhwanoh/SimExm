@@ -53,7 +53,7 @@ cdef class ConfocalUnit:
     cdef int pixel_size
 
 
-    cpdef calculate_parameters(self, object voxel_dims)
+    cpdef object compute_parameters(self, object voxel_dims, int expansion_factor, )
         '''
         Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
         Gaussian approximation taken from "Gaussian Approximation offluorescence miscorcope point spread function models" by bo Zhang et al.
@@ -61,7 +61,7 @@ cdef class ConfocalUnit:
         voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
         '''
 
-    cpdef object resolve_volume(self, object volume, object volume_gt, object volume_dims, object fluors)
+    cpdef object resolve_volume(self, object volume, object volume_dims, object fluors)
         '''
         Main optics function, resolves fluorophore volume given the microscope parameters
 
@@ -191,7 +191,7 @@ cdef class ConfocalUnit:
         non_normalized (numpy X x Y x Z float) : the non_normalized volume of photons
         '''
 
-    cpdef object get_param_dict(self)
+    cpdef object get_parameters(self)
         ''' Returns a dicitonary containing the parameters used by the optical simulation '''
 
 
