@@ -25,8 +25,7 @@ cdef class BrainbowUnit:
     cdef object labeled_cells  # Used to keep track of labeled cells and region for call to get_ground_truth
 
     #Methods
-    cpdef label_cells(self, region_type = *, fluors = *, protein_density = *, labeling_density = *,\
-     antibody_amplification_factor = *, fluor_noise = *, membrane_only = *, single_neuron = *)
+    cpdef label_cells(self, region_type = *, fluors = *, protein_density = *, labeling_density = *, antibody_amplification_factor = *, fluor_noise = *, membrane_only = *, single_neuron = *)
         '''
         Labels the cells in the volume withe the given parameter. 
         You can call label_cells multiple times and then use get_labeled_volume to retrived the labeled volume.

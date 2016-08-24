@@ -47,7 +47,7 @@ cdef class BrainbowUnit:
         '''
 
         assert(len(fluors) > 0, "Indicate at least one fluor")
-        assert(protein_density >= 0 labeling_density >= 0 and antibody_amplification_factor >= 0,\
+        assert(protein_density >= 0 and labeling_density >= 0 and antibody_amplification_factor >= 0,\
          "Protein density, labeling density and anitbody aamplication factor should be non negative")
         #Prepare data
         self.num_fluorophores += len(fluors)
