@@ -34,33 +34,34 @@ cdef class ExpansionUnit:
         ''' 
         Performs expansion of volume in all directions, padding wiht 0s 
 
-        fluo_volume (fluorophore x X x Y x Z numpy array, uint32) : the volume to expand
+        fluo_volume (fluorophore x Z x X x Y numpy array, uint32) : the volume to expand
         '''
 
         cdef np.ndarray[np.uint32_t, ndim=2] number_per_fluor
-        (colors, X, Y, Z) = np.nonzero(fluo_volume)
-        number_per_fluor = fluo_volume[:, X, Y, Z]
-        newX = np.clip(self.expansion_factor * X + np.random.randint(-self.expansion_factor, self.expansion_factor, size = X.size), 0, self.expansion_factor * fluo_volume.shape[1] - 1)
-        newY = np.clip(self.expansion_factor * Y + np.random.randint(-self.expansion_factor, self.expansion_factor, size = X.size), 0, self.expansion_factor * fluo_volume.shape[2] - 1)
-        newZ = np.clip(self.expansion_factor * Z + np.random.randint(-self.expansion_factor, self.expansion_factor, size = X.size), 0, self.expansion_factor * fluo_volume.shape[3] - 1)
+        (colors, Z, X, Y) = np.nonzero(fluo_volume)
+        number_per_fluor = fluo_volume[:, Z, X, Y]
+        newX = np.clip(self.expansion_factor * X + np.random.randint(-self.expansion_factor, self.expansion_factor, size = Z.size), 0, self.expansion_factor * fluo_volume.shape[2] - 1)
+        newY = np.clip(self.expansion_factor * Y + np.random.randint(-self.expansion_factor, self.expansion_factor, size = Z.size), 0, self.expansion_factor * fluo_volume.shape[3] - 1)
+        newZ = np.clip(self.expansion_factor * Z + np.random.randint(-self.expansion_factor, self.expansion_factor, size = Z.size), 0, self.expansion_factor * fluo_volume.shape[1] - 1)
         indices = np.argsort(newZ)
-        return (number_per_fluor[:,indices], newX[indices], newY[indices], newZ[indices])
+
+        return (number_per_fluor[:,indices], newZ[indices], newX[indices], newY[indices])
 
     cpdef object expand_ground_truth(self, np.ndarray[np.uint32_t, ndim=3] fluo_gt_volume):
         ''' 
         Performs expansion of the groudn truth volume in all directions, padding wiht 0s 
 
-        fluo_volume_gt (X x Y x Z numpy array, uint32) : the ground truth volume to expand
+        fluo_volume_gt (Z x X x Y numpy array, uint32) : the ground truth volume to expand
         '''
 
-        (X, Y, Z) = np.nonzero(fluo_gt_volume)
-        values = fluo_gt_volume[X, Y, Z]
+        (Z, X, Y) = np.nonzero(fluo_gt_volume)
+        values = fluo_gt_volume[Z, X, Y]
         newX = self.expansion_factor * X
         newY = self.expansion_factor * Y
         newZ = self.expansion_factor * Z
         indices = np.argsort(newZ)
         
-        return (values[indices], newX[indices], newY[indices], newZ[indices])
+        return (values[indices], newZ[indices], newX[indices], newY[indices])
 
     cpdef object get_parameters(self):
         ''' Returns dictionary containing the expansion parameters '''

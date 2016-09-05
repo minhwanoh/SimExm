@@ -44,10 +44,10 @@ class Cell:
       '''
       Sets the main voxels covering the cell and its membrane. This should be done before loading any region annotation.
 
-      voxels (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell 
-      membrane (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell's membrane
+      voxels (numpy Nx3 array, uint32) : list of (z, x, y) locations covering the cell 
+      membrane (numpy Nx3 array, uint32) : list of (z, x , y) locations covering the cell's membrane
       '''
-      full_region = CellRegion(region_id = 1, voxels, membrane, region_type = 'full')
+      full_region = CellRegion('full', 1, voxels, membrane)
       self.add_region(full_region)
 
     def get_cell_type(self):
@@ -58,27 +58,27 @@ class Cell:
     def get_cell_id(self):
       ''' Returns the cell_id of the cell '''
 
-      return cell_id
+      return self.cell_id
 
     def get_full_cell(self, membrane_only = False):
       '''
-      Returns a list of (x, y , z) locations covering the whole cell. 
+      Returns a list of (z, x, y) locations covering the whole cell. 
       
       membrane_only (boolean) : if True, selects only membrane voxels.
       '''
 
-      return self.get_region(region_id=1, 'full', membrane_only)
+      return self.get_region('full', 1, membrane_only)
 
-    def add_region(self, cell_region):
+    def add_region(self, region):
       '''
       Add a new region to a cell. 
 
-      cell_region (CellRegion) : CellRegion obect to add to the cell
+      region (CellRegion) : CellRegion obect to add to the cell
       '''
 
-      if not cell_regions.has_key(region.get_region_type()):
-        cell_regions[region.get_region_type())] = {}
-      self.cell_regions[region.get_region_type())][region.get_region_id()] = region
+      if not self.cell_regions.has_key(region.get_region_type()):
+        self.cell_regions[region.get_region_type()] = {}
+      self.cell_regions[region.get_region_type()][str(region.get_region_id())] = region
 
     def get_region_types(self):
       ''' Returns all the types of region annotation present in the dataset as a list of strings. '''
@@ -92,10 +92,10 @@ class Cell:
       region_type (string) : the type of the regions to query
       '''
 
-      assert(self.cell_regions.has_key(region_type), "Cell has no such region")
+      assert self.cell_regions.has_key(region_type), "Cell has no such region : " + region_type
       return self.cell_regions[region_type].keys()
 
-    def get_region(self, region_id, region_type, membrane_only = False):
+    def get_region(self, region_type, region_id, membrane_only = False):
       '''
       Returns the given cell region as a list of voxel locations.
 
@@ -107,18 +107,32 @@ class Cell:
       region = self.cell_regions[region_type][region_id]
       return region.get_voxels(membrane_only)
 
-    def get_all_regions(self, region_type, membrane_only = False):
+    def get_all_regions_as_dict(self, region_type, membrane_only = False):
       ''' 
       Returns a dictionary from region_id to voxel list (numpy Nx3 array, uint32)
 
       region_type (string) : the type of the regions to query
       membrane_only (boolean) : if True, selects only membrane voxels
       '''
-      out = np.array([], np.uint32)
-      for region_id in self.get_all_region_ids_of_type(region_type):
-        region_id = str(region_id) #key is string for dict below
-        region = self.get_region(region_id, region_id, membrane_only)
-        out = np.append(out, region, 0)
+      out = {}
+      for region_id in self.get_all_region_ids(region_type):
+        region = self.get_region(region_type, region_id, membrane_only)
+        out[str(region_id)] = region
+
+      return out
+
+    def get_all_regions_as_array(self, region_type, membrane_only = False):
+      ''' 
+      Returns a dictionary from region_id to voxel list (numpy Nx3 array, uint32)
+
+      region_type (string) : the type of the regions to query
+      membrane_only (boolean) : if True, selects only membrane voxels
+      '''
+      region_ids = self.get_all_region_ids(region_type)
+      out = self.get_region(region_type, region_ids[0], membrane_only)
+      for i in range(1, len(region_ids)):
+        region = self.get_region(region_type, region_ids[i], membrane_only)
+        out = np.append(out, region, axis=0)
 
       return out
 
@@ -135,12 +149,12 @@ class CellRegion:
     '''
 
     
-    def __init__(self, region_id, region_type, voxels, membrane):
+    def __init__(self, region_type, region_id, voxels, membrane):
       '''
       Initalize CellRegion object, set attributes.
 
-      region_id (int) : the id of the region object (taken from the ground truth to allow future reference)
       region_type (string) : the type of the region, could be synapse, dendrite, axon, soma, ...
+      region_id (int) : the id of the region object (taken from the ground truth to allow future reference)
       voxels (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell region
       membrane (numpy Nx3 array, uint32) : list of (x, y , z) locations covering the cell region's membrane
       '''

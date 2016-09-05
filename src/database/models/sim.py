@@ -7,6 +7,8 @@ The Simstack and SimParam class.
 
 from images2gif import writeGif
 from tifffile import imsave
+from PIL import Image
+import numpy as np
 import json
 
 class SimStack:
@@ -23,9 +25,9 @@ class SimStack:
         sim_params (SimParams) : an instance of the SimParams class, which helps deal with parameter file
         '''
 
-        self.image_sequence = [image_volume[i, :, :, :] for i in range(image_volume.shape[0])]
-        self.ground_truth = [ground_truth[i, :, :] for i in range(ground_truth.shape[0])]
-        self.num_channels = self.image_sequence[0].shape[2]
+        self.image_sequence = [np.squeeze(image_volume[i, :, :, :]) for i in range(image_volume.shape[0])]
+        self.ground_truth = [np.squeeze(ground_truth[i, :, :]) for i in range(ground_truth.shape[0])]
+        self.num_channels = image_volume.shape[3]
         self.sim_params = sim_params
 
         if self.num_channels < 3:
@@ -45,7 +47,7 @@ class SimStack:
             new_image = np.concatenate([image, empty], 2)
             self.image_sequence[i] = new_image
 
-    def save_as_gif(path, name):
+    def save_as_gif(self, path, name):
         ''' 
         Save image sequence as gif for immediate visualization 
 
@@ -59,7 +61,7 @@ class SimStack:
         writeGif(path + name + "_gt.gif", self.ground_truth, duration=0.5)
         self.sim_params.save(path, name + "_params")
 
-    def save_as_image_sequence(path, name):
+    def save_as_image_sequence(self, path, name):
         '''
         Save image sequence as a sequence of png images in the given directory
 
@@ -76,7 +78,7 @@ class SimStack:
             gt.save(path + name + "_gt/" + "image_" + str(i) + ".png")
         self.sim_params.save(path, name + "_params")
 
-    def save_as_tiff(path, name, sixteen_bit_mode = False):
+    def save_as_tiff(self, path, name, sixteen_bit_mode = False):
         '''
         Save image sequence as multi-page tiff stack
 
@@ -86,10 +88,10 @@ class SimStack:
         '''
         if path[-1] != "/": path += "/"
         if sixteen_bit_mode:
-            imsave(path + name + ".tif", np.array(image_sequence, np.uint16))
+            imsave(path + name + ".tif", np.array(self.image_sequence, np.uint16), photometric='rgb')
         else:
-            imsave(path + name + ".tif", np.array(image_sequence, np.uint8))
-        imsave(path + name + "_gt.tif", np.array(image_sequence, np.float32))
+            imsave(path + name + ".tif", np.array(self.image_sequence, np.uint8), photometric='rgb')
+        imsave(path + name + "_gt.tif", np.array(self.ground_truth, np.float32), photometric='minisblack')
         self.sim_params.save(path, name + "_params")
 
 
@@ -112,7 +114,7 @@ class SimParams:
 
         self.volume_dim = volume_dim
         self.gt_params = gt_params
-        self.labeling_params = labeling_unit
+        self.labeling_params = labeling_params
         self.optics_params = optics_params
         self.expansion_params = expansion_params
 
@@ -127,15 +129,16 @@ class SimParams:
 
         if path[-1] != "/": path += "/"
 
-        pre_expansion_space_voxel_dim = self.optics_params['pixel_size'] / self.optics_params['objective_factor'] 
-        post_expansion_space_voxel_dim = pre_expansion_space_voxel_dim / self.expansion_params['expansion_factor']
+        pre_expansion_space_voxel_dim = [self.optics_params['pixel_size'] / self.optics_params['objective_factor'],\
+          self.optics_params['pixel_size'] / self.optics_params['objective_factor'], self.optics_params['focal_plane_depth']]
+        post_expansion_space_voxel_dim = [pre_expansion_space_voxel_dim[i] / self.expansion_params['expansion_factor'] for i in range(3)]
 
         total_gt_size = [self.gt_params['volume_dim'][i] * self.gt_params['voxel_dim'][i] for i in range(3)]
         total_sim_size_pre = [self.volume_dim[i] * pre_expansion_space_voxel_dim[i] for i in range(3)]
         total_sim_size_post = [self.volume_dim[i] * post_expansion_space_voxel_dim[i] for i in range(3)]
 
         parameters = { 'volume_dim' : self.volume_dim, \
-                    'ground_truth' : self.gt_params, 'labeling' : self.labeling_params, 'optics': self.optics_params, 'expansion' = self.expansion_params, \
+                    'ground_truth' : self.gt_params, 'labeling' : self.labeling_params, 'optics': self.optics_params, 'expansion' : self.expansion_params, \
                     'pre_expansion_space_voxel_dim' : pre_expansion_space_voxel_dim, 'post_expansion_space_voxel_dim' : post_expansion_space_voxel_dim,
                     'total_ground_truth_size' : total_gt_size, 'total_sim_size_pre_exp_space' : total_sim_size_pre, 'total_sim_size_posT_exp_space' : total_sim_size_post\
                     }

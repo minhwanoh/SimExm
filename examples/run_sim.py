@@ -5,13 +5,18 @@ An example SimExm script. Guides through data loading + simulation
 '''
 
 #Indicate the path to SimExm
-path_to_SimExm = '~/SimExm'
+path_to_SimExm = '/home/jeremy/SimExm'
 import sys; sys.path.insert(0, path_to_SimExm)
 
 import os
 from src.database.lib import load_to_array
-from src.database.dataset import Dataset
-from src.database.sim import SimStack, SimParams
+from src.database.models.dataset import Dataset
+from src.database.models.sim import SimStack, SimParams
+from src.simulation.models.expansion import ExpansionUnit
+from src.simulation.models.labeling import BrainbowUnit
+from src.simulation.models.optics import ConfocalUnit
+from PIL import Image
+import numpy as np
 
 
 
@@ -20,18 +25,18 @@ from src.database.sim import SimStack, SimParams
 
 
 #Paths to db and original images
-original_images_path = "~/connectomics_data/ground_truth_original_format/Janelia/images"
+original_images_path = "/home/jeremy/connectomics_data/ground_truth_original_format/Janelia/images"
 #add other region stacks here. See database.lib.load_image_stack
 #synapses_images_path = ..
 #axon_images_path = ..
 
 #Parameters
 voxel_dim = (8, 8, 8) #Jenalia dataset
-bounds_wanted = (500, 500, 100) #width, height, depth of output stack
-offset = (1000, 1000, 3000) # required ground truth data is loaded around this location
+bounds_wanted = (10, 500, 500) #depth, width, height of output stack
+offset = (2000, 1000, 1000) # (z, x, y) offset from which to load the images (crops the stack)
 
-#Path to temporary db file for fast data loading (make sure to end with .h5)
-db_path = "~/allo.h5"
+#Path to temporary db file for fast data loading (make sure to end with .hdf5)
+db_path = "/home/jeremy/allo.hdf5"
 
 
 
@@ -47,7 +52,7 @@ gt_dataset = Dataset()
 labeling_unit = BrainbowUnit(gt_dataset)
 
 
-#Now create the expansion unit, which takes the dataset as input
+#Now create the expansion unit
 """
 Default:
 
@@ -80,10 +85,10 @@ objective_factor  = 40.0
 pixel_size = 6500
 """
 
-optical_unit = ConfocalUnit(num_channels = 3)
+optical_unit = ConfocalUnit(num_channels = 3, baseline = [0,0,0], numerical_aperture = 1.1)
+
 #Compute additional parameters, using the voxel_dim, the expansion factor and the wanted output bounds
 bounds_required = optical_unit.compute_parameters(voxel_dim, expansion_unit.get_expansion_factor(), bounds_wanted)
-
 
 ###############################  LOAD DATA  ###############################
 
@@ -92,10 +97,11 @@ if os.path.exists(db_path):
 	#If file already exists, load from it
 	gt_dataset.load_from_db(db_path)
 else:
-	#We can now start to load the ground truth data
-	im_data = load_to_array(original_images_path, bounds_required)
-	gt_dataset.load_from_image_stack(im_data)
-	gt_dataset.save_to_db(db_path)
+	#If not, we load from data path
+	print "Loading data..."
+	im_data = load_to_array(original_images_path, offset, bounds_required)
+	gt_dataset.load_from_image_stack(voxel_dim, im_data)
+	gt_dataset.save_to_db(db_path) #Save for quick reuse
 
 
 
@@ -110,7 +116,7 @@ Default:
 
 region_type = 'full' #The region to label, could be synapses, dendrites, etc.. depending on what was loaded in the ground truth
 labeling_density = 0.25
-protein density = 0.80 # 1 means 1 per voxel on average
+protein density = 0.80 # 1 means 1 fluorophore per nm3
 antibody_amplification_factor = 5
 fluors = ['ATTO488', 'ATTO550', 'ATTO647N'] #can use any of  [Alexa350, Alexa790, ATTO390, ATTO425, ATTO430LS, ATTO465, ATTO488, ATTO490LS, ATTO550, ATTO647N, ATTO700]
 fluor_noise = 0.00001
@@ -118,36 +124,47 @@ membrane_only = True
 single_neuron = False
 """
 
-labelingUnit.label_cells(region_type = 'full', fluors = ['ATTO488'], labeling_density = 1, membrane_only = True)
-labelingUnit.label_cells(region_type = 'full', fluors = ['ATTO550'], labeling_density = 0.1, membrane_only = False)#Repeat this as many time as you'd like
+print "Performing labeling simulation..."
 
-fluo_volume = labelingUnit.get_labeled_volume()
-fluo_gt = labelingUnit.get_ground_gruth(membrane_only = gt_membrane_only)
+#Repeat this as many time as you'd like
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488'], labeling_density = 1, protein_density = 0.6, membrane_only = True)
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO550', 'ATTO647N'], labeling_density = 0.1, membrane_only = False)
+
+
+fluo_volume = labeling_unit.get_labeled_volume()
+fluo_gt = labeling_unit.get_ground_truth(membrane_only = gt_membrane_only)
 
 #Now pass to expansion unit
 
+print "Performing expansion simulation..."
+
 expanded_volume = expansion_unit.expand_volume(fluo_volume)
 expanded_gt = expansion_unit.expand_ground_truth(fluo_gt)
-expanded_dim = bounds_required * expansion_unit.get_expansion_factor()
+expanded_dim = [bounds_required[i] * expansion_unit.get_expansion_factor() for i in range(len(bounds_required))]
+
+print "Performing optics simulation..."
 
 #Now pass to optical unit
-
-sim_volume = optical_unit.resolve_volume(expanded_volume, expanded_dim)
+sim_volume = optical_unit.resolve_volume(expanded_volume, expanded_dim, labeling_unit.get_fluors_used())
 sim_gt = optical_unit.resolve_ground_truth(expanded_gt, expanded_dim)
 
 
 #Create a SimStack and a SimParam object for easy storage and visualization
-sim_params = SimParams(bounds_wanted, gt_dataset.get_parameters(), labeling_unit.get_parameters(), expansion_unit.get_parameters(), optical_unit.get_parameters())
-sim_stack = SimStack(sim_volume, sim_gt, sim_param)
+sim_params = SimParams(bounds_wanted, gt_dataset.get_parameters(), labeling_unit.get_parameters(),\
+	expansion_unit.get_parameters(), optical_unit.get_parameters())
+sim_stack = SimStack(sim_volume, sim_gt, sim_params)
 
 ###############################   SAVE   ###############################
 
+print "Saving results..."
+
 sim_name = "simulation1"
-dest = "~/"
+dest = "/home/jeremy/"
 
 #Save or view the sim_stack, can save as tiff, gif, image_sequence (see src.database.models.sim.SimStack)
 sim_stack.save_as_tiff(dest, sim_name)
 
+print "Done!"
 
 
 

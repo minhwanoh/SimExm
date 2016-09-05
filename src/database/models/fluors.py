@@ -15,30 +15,27 @@ class Fluorophore:
     Interface to interace with a fluorophore's data.
     Instances of the FLuorohore class are used to enumerate fluorophore parameters,
     some of which are hard-coded in this file.
+
+    Init method, sets attributes
+
+    name (string) : Name given to the fluorophore
+    xls (string) : Path to xls file containing fluorophore data
+    excitation (string) : string, Path to file containing excitation data
+    emission (string) : Path to file containing excitation data
+    extinction_coefficient (int) : Coefficient of exctinction
+    quantum_yield (float) : Value of the quantum yeild
+    source (string) : Source where the data can be obtained / verified
+    comments (string) : Additonal comments for the user 
     '''
 
-    def __init__(self, name, xls, quantum_yield, extinction_coefficient, emission, excitation, source, comments = ""):
-        '''
-        Init method, sets attributes
-
-        name (string) : Name given to the fluorophore
-        xls (string) : Path to xls file containing fluorophore data
-        excitation (string) : string, Path to file containing excitation data
-        emission (string) : Path to file containing excitation data
-        extinction_coefficient (int) : Coefficient of exctinction
-        quantum_yield (float) : Value of the quantum yeild
-        source (string) : Source where the data can be obtained / verified
-        comments (string) : Additonal comments for the user 
-        '''
-
-        self.name = name
-        self.xls = xls
-        self.quantum_yield = quantum_yield
-        self.extinction_coefficient = extinction_coefficient
-        self.emission = emission
-        self.excitation = excitation
-        self.source = source
-        self.comments = comments
+    name = ""
+    xls = ""
+    quantum_yield = 0.0
+    extinction_coefficient = 0.0
+    emission = ""
+    excitation = ""
+    source = ""
+    comments = ""
 
     def get_name(self):
         ''' Returns the (string) type of the fluoropore '''
@@ -83,7 +80,7 @@ class Fluorophore:
         raw_data = np.array([s.split("\t") for s in raw_data], dtype=float)
         return raw_data
 
-    def find_excitation(self, wavelenght):
+    def find_excitation(self, wavelength):
         ''' 
         Returns the excitation value of the given fluorophore, at the given wavelenght
 
@@ -99,7 +96,7 @@ class Fluorophore:
         if (wavelength < data_min) or (wavelength > data_max):
             excitation = 0
         else:
-            index      = int(floor((wavelength - data_min) / interval))
+            index      = int(np.floor((wavelength - data_min) / interval))
             index -= 1
             weight     = wavelength - (data_min + index * interval)
             excitation = weight * data[index + 2] + (1 - weight) * data[index + 1]
@@ -122,7 +119,7 @@ class Fluorophore:
         emission = 0
 
         if wavelength_max < data_max:
-            index = int(floor((wavelength_max - data_min) / interval))
+            index = int(np.floor((wavelength_max - data_min) / interval))
         else:
             index = len(data) - 1
 

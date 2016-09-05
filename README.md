@@ -26,20 +26,23 @@ which will compile the extensions. Make sure to have a look at the Makefile for 
 
 The simulation is run through simple scripts. There are four steps to a SimExm script:  
 
-1. Choosing a ground truth dataset to simulate.
+1. Creating the ground_truth object, the labeling, expansion and optics units.
 2. Choosing labeling parameters and running the labeling simulation.
-2. Choosing optics parameters and running the imaging simulation.
+2. Running the imaging simulation.
 3. Saving, or visualizing the simulated output.
 
-An example script can be found here: ./scripts/run_sim_easy.py
-A more advanced script can be found here: ./scripts/run_sim_advanced.py
+An example script can be found here: ./scripts/run_sim.py
 
-Make sure to check out both to get a better understanding of how to build a sim script.
+Make sure to check it out to get a better understanding of how to build a sim script.
 
 Alternatively you can use the the IPython Notebooks which can be found in ./notebooks. 
 To start the notebooks:
 
-`cd ./notebooks; jupyter notebook`
+`cd ./notebooks; jupyter notebook` 
+
+or: 
+
+`make notebook`
 
 
 

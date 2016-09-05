@@ -6,7 +6,6 @@ The BrainbowUnit class
 
 import numpy as np
 cimport numpy as np
-from src.database.models.dataset import Fluorset
 
 cdef class BrainbowUnit:
     '''
@@ -24,14 +23,13 @@ cdef class BrainbowUnit:
         '''
         
         self.gt_dataset = gt_dataset 
-        self.fluorset = Fluorset() # taken straight from software internal database
 
         self.fluo_volumes = [] # Used to stack results from multiple calls to label_cells
         self.parameters = [] # Used to stack parameters from multiple calls to label_cells
         self.labeled_cells = {} # Used to keep track of labeled cells and region for call to get_ground_truth
 
-    cpdef label_cells(self, region_type = 'full', fluors = ['ATTO488'], protein_density = 0.8, labeling_density = 0.2,\
-     antibody_amplification_factor = 5, fluor_noise = 0, membrane_only = True, single_neuron = False):
+    cpdef label_cells(self,object region_type = 'full', object fluors = ['ATTO488'], float protein_density = 0.8, float labeling_density = 0.2,\
+     int antibody_amplification_factor = 5, float fluor_noise = 0, membrane_only = True, single_neuron = False):
         '''
         Labels the cells in the volume withe the given parameter. 
         You can call label_cells multiple times and then use get_labeled_volume to retrived the labeled volume.
@@ -46,27 +44,30 @@ cdef class BrainbowUnit:
         single_neuron (boolean) : if True, labels a single random neuron in the dataset
         '''
 
-        assert(len(fluors) > 0, "Indicate at least one fluor")
-        assert(protein_density >= 0 and labeling_density >= 0 and antibody_amplification_factor >= 0,\
-         "Protein density, labeling density and anitbody aamplication factor should be non negative")
+        assert (len(fluors) > 0) , "Indicate at least one fluor"
+        assert (protein_density >= 0 and labeling_density >= 0 and antibody_amplification_factor >= 0),\
+         "Protein density, labeling density and anitbody aamplication factor should be non negative"
         #Prepare data
-        self.num_fluorophores += len(fluors)
+
         labeling_dict = {}
         cells = self.gt_dataset.get_all_cells()
 
         if single_neuron: #Select a single neuron
-            cells = [cells[np.random.randint(0, len(cells))]]
+            cell_ids = cells.keys()
+            cell_id = cell_ids[np.random.randint(0, len(cell_ids))]
+            cells = {cell_id : cells[cell_id]} # select single neuron
             labeling_density = 1
 
-        for cell in cells:
-            if np.random.random_sample() <= self.labeling_density: continue
-            if not self.labeled_cells.has_key(cell.get_cell_id()):
-                self.labeled_cells[cell.get_cell_id()] = {}
-            self.labeled_cells[cell.get_cell_id()][region_type] = 1
-            labeling_dict[cell.get_cell_id()] = cell.get_all_regions(region_type, membrane_only = membrane_only)
+        for cell_id in cells.keys():
+            cell = cells[cell_id]
+            if np.random.random_sample() > labeling_density: continue
+            if not self.labeled_cells.has_key(cell_id):
+                self.labeled_cells[cell_id] = {}
+            self.labeled_cells[cell_id][region_type] = 1
+            labeling_dict[str(cell_id)] = cell.get_all_regions_as_array(region_type, membrane_only = membrane_only)
 
-        self.perform_labeling(labeling_dict, fluors, protein_density, labeling_density, antibody_amplification_factor)
-        self.add_param(fluors, protein_density, antibody_amplification_factor, fluor_noise, region_type, membrane_only, single_neuron)
+        self.perform_labeling(labeling_dict, fluors, protein_density, antibody_amplification_factor)
+        self.add_param(fluors, protein_density, labeling_density, antibody_amplification_factor, fluor_noise, region_type, membrane_only, single_neuron)
 
     
     cpdef perform_labeling(self, object labeling_dict, object fluors, float protein_density, int antibody_amplification_factor):
@@ -91,23 +92,23 @@ cdef class BrainbowUnit:
         num_neurons = neuron_list.size
         num_fluorophores = len(fluors)
 
-        (x, y, z) = self.gt_dataset.get_volume_dim()
-        proteins = np.zeros((num_fluorophores, x, y, z), np.uint32)
+        (z, x, y) = self.gt_dataset.get_volume_dim()
+        proteins = np.zeros((num_fluorophores, z, x, y), np.uint32)
 
         #Get infections for each neuron
         infections = self.get_infections(num_neurons, num_fluorophores)
         voxel_dim =  self.gt_dataset.get_voxel_dim()
 
         for n in range(num_neurons): 
-            locations = np.array(labeling_dict[neuron_list[n]], np.uint32)
-            (X, Y, Z)= np.transpose(locations)
-            probabilities = np.ones(X.size, np.float64) * 1.0/<float>X.size
+            locations = np.array(labeling_dict[str(neuron_list[n])], np.uint32)
+            (Z, X, Y)= np.transpose(locations)
+            probabilities = np.ones(Z.size, np.float64) * 1.0/<float>Z.size
 
             for k in range(num_fluorophores):
                 if infections[n, k] > 0:
-                    num_proteins = np.random.poisson(<int>(self.protein_density * X.size * np.prod(voxel_dim)))
+                    num_proteins = np.random.poisson(<int>(protein_density * Z.size * np.prod(voxel_dim)))
                     protein_distribution = np.random.multinomial(num_proteins, probabilities, size=1).astype(np.uint32)
-                    proteins[k, X, Y, Z] =  protein_distribution * self.antibody_amplification_factor
+                    proteins[k, Z, X, Y] =  protein_distribution * antibody_amplification_factor
 
         self.fluo_volumes.append(proteins)
 
@@ -116,9 +117,9 @@ cdef class BrainbowUnit:
         '''Adds random number of fluorophores in the volume. In reconstruciton..'''
 
         cdef int x, y, z, channels
-        channels, x, y, z = fluo_volume.shape[0], fluo_volume.shape[1], fluo_volume.shape[2], fluo_volume.shape[3]
-        cdef np.ndarray[np.uint32_t, ndim=4] poisson_number = np.random.poisson(poisson_mean, size=(channels, x, y, z)).astype(np.uint32)
-        cdef np.ndarray[np.uint32_t, ndim=4] poisson_probability = (np.random.rand(channels, x, y, z) < self.fluor_noise).astype(np.uint32)
+        channels, z, x, y = fluo_volume.shape[0], fluo_volume.shape[1], fluo_volume.shape[2], fluo_volume.shape[3]
+        cdef np.ndarray[np.uint32_t, ndim=4] poisson_number = np.random.poisson(poisson_mean, size=(channels, z, x, y)).astype(np.uint32)
+        cdef np.ndarray[np.uint32_t, ndim=4] poisson_probability = (np.random.rand(channels, z, x, y) < self.fluor_noise).astype(np.uint32)
         return np.add(fluo_volume, np.multiply(poisson_number, poisson_probability) * self.antibody_amplification_factor)
 
     cpdef np.ndarray[np.uint32_t,ndim=2] get_infections(self, int neuron_number, int num_fluorophores):
@@ -138,16 +139,16 @@ cdef class BrainbowUnit:
         return infect
 
     cpdef np.ndarray[np.uint32_t, ndim=4] get_labeled_volume(self):
-        ''' Returns the labeled volume as a (fluorophore x X x Y x Z) numpy array, uint32 '''
+        ''' Returns the labeled volume as a (fluorophore x Z x X x Y) numpy array, uint32 '''
 
         volumes = np.concatenate(self.fluo_volumes, 0)
-        (num_channles, x, y, z) = volumes.shape
-        fluors = list(set([param['fluor'] for param in self.parameters]))
-        labeled_volume = np.zeros((len(fluors), x, y, z), np.uint32)
+        (num_volumes, z, x, y) = volumes.shape
+        fluors = self.get_fluors_used()
+        labeled_volume = np.zeros((len(fluors), z, x, y), np.uint32)
 
         for i in range(len(fluors)):
              #Find volumes of same fluorophore and merge them
-            for j in range(num_channles):
+            for j in range(num_volumes):
                 if self.parameters[j]['fluor'] == fluors[i]:
                     labeled_volume[i, :, :, :] += volumes[j, :, :, :]
 
@@ -155,23 +156,24 @@ cdef class BrainbowUnit:
 
 
     cpdef np.ndarray[np.uint32_t, ndim=4] get_ground_truth(self, membrane_only = False):
-         ''' 
-         Returns the corresponding ground truth labeling as an (X x Y x Z) numpy array, uint32 
+        ''' 
+        Returns the corresponding ground truth labeling as an (X x Y x Z) numpy array, uint32 
 
-         membrane_only (boolean) : if True, ground truth has only membranes. Tip: use False and use imageJ edge detection if you need the membranes too.
-         '''
+        membrane_only (boolean) : if True, ground truth has only membranes. Tip: use False and use imageJ edge detection if you need the membranes too.
+        '''
 
         cdef int x, y, z
-        (x, y, z) = self.gt_dataset.get_volume_dim()
-        cdef np.ndarray[np.uint32_t, ndim=4] ground_truth = np.zeros((x, y, z), np.uint32)
-        cells = self.gt_dataset.get_all_cells():
+        (z, x, y) = self.gt_dataset.get_volume_dim()
+        cdef np.ndarray[np.uint32_t, ndim=3] ground_truth = np.zeros((z, x, y), np.uint32)
+        cells = self.gt_dataset.get_all_cells()
 
-        for cell in cells:
+        for cell_id in cells.keys():
+            cell = cells[cell_id]
             if self.labeled_cells.has_key(cell_id):
-                for region in self.labeled_cells[cell_id].keys():
-                    locations = cell.get_all_regions_of_type(region, membrane_only = membrane_only)
-                    (X, Y, Z) = np.transpose(locations)
-                    ground_truth[X, Y, Z] = cell_id
+                for region_type in self.labeled_cells[cell_id].keys():
+                    locations = cell.get_all_regions_as_array(region_type, membrane_only = membrane_only)
+                    (Z, X, Y) = np.transpose(locations)
+                    ground_truth[Z, X, Y] = int(cell_id)
 
         return ground_truth
 
@@ -188,7 +190,6 @@ cdef class BrainbowUnit:
         for fluor in fluors:
             #Create param dict
             params  = {}
-            params['unit_type'] = self.get_type()
             params['protein_density'] = protein_density
             params['labeling_density'] = labeling_density
             params['antibody_amplification_factor'] = antibody_amplification_factor
@@ -206,11 +207,19 @@ cdef class BrainbowUnit:
         for param_dict in self.parameters:
             fluor = param_dict['fluor']
             if out.has_key(fluor):
-                out[fluor] = {param : list(param_dict['params'][param]).append() for param in param_dict['params'].keys()}
+                for param in param_dict['params'].keys():
+                     out[fluor][param].append(param_dict['params'][param])
             else:
-                out[fluor] = param_dict['params']
+                out[fluor] = {}
+                for param in param_dict['params'].keys():
+                     out[fluor][param] = [param_dict['params'][param]]
 
         return out
+
+    cpdef object get_fluors_used(self):
+        '''Returns the total list of fluorophores used in the volume'''
+
+        return list(set([param['fluor'] for param in self.parameters]))
 
     cpdef object get_type(self):
         ''' Returns the type of the labeling unit, here Brainbow. '''
