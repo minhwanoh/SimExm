@@ -52,6 +52,8 @@ cdef class ConfocalUnit:
     cdef object laser_intensities
     cdef object std_dev_xy
     cdef object std_dev_z
+    cdef object kernel_shape
+    cdef object kernel_dim
     cdef int z_offset_step
     cdef float scale_factor_xy
     cdef int focal_plane_depth
@@ -82,7 +84,7 @@ cdef class ConfocalUnit:
 
     cdef np.ndarray[np.float64_t, ndim=2] get_2dgaussian_kernel(self, int x, int y, float sigma_x, float sigma_y)
 
-    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self, float sigma_x, float sigma_y, float sigma_z, int channel)
+    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self, int channel)
 
     cdef np.ndarray[np.float64_t, ndim=2] project_photons(self,  long[:] X, long[:] Y, long[:] Z, unsigned int[:] photons, int z_offset, int channel, object dims)
 

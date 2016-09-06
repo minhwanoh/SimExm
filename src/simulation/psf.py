@@ -96,6 +96,7 @@ import time
 import threading
 
 import numpy
+from matplotlib import pyplot
 
 try:
     import _psf
@@ -666,7 +667,7 @@ def imshow(subplot, data, title=None, sharex=None, sharey=None,
     Requires pyplot already imported ``from matplotlib import pyplot``.
 
     """
-    pyplot = sys.modules['matplotlib.pyplot']
+    #pyplot = sys.modules['matplotlib.pyplot']
 
     ax = pyplot.subplot(subplot, sharex=sharex, sharey=sharey, axisbg='k')
     if title:

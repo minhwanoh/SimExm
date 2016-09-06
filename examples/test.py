@@ -11,50 +11,63 @@ from src.simulation.models.optics import ConfocalUnit
 from PIL import Image
 import numpy as np
 from src.simulation._psf import gaussian_sigma
+import src.simulation.psf as psf
+from tifffile import imsave
 
 
 
 def test_data_input(path):
 
-	gt_dataset = Dataset()
-	offset = (0, 0, 0)
-	bounds_required = [1, 2000, 2000]
-	im_data = load_to_array(path, offset, bounds_required)
+    gt_dataset = Dataset()
+    offset = (0, 0, 0)
+    bounds_required = [1, 2000, 2000]
+    im_data = load_to_array(path, offset, bounds_required)
 
-	gt_dataset.load_from_image_stack((8,8,8), im_data)
+    gt_dataset.load_from_image_stack((8,8,8), im_data)
 
-	print gt_dataset.get_all_cell_ids()
+    print gt_dataset.get_all_cell_ids()
 
-	cell =  gt_dataset.get_all_cells()['133']
+    cell =  gt_dataset.get_all_cells()['133']
 
-	print cell.get_region_types()
-	print cell.get_all_region_ids('full')
-	print cell.get_region('full', 1)
-	print cell.get_all_regions_as_array('full')
+    print cell.get_region_types()
+    print cell.get_all_region_ids('full')
+    print cell.get_region('full', 1)
 
-	print gt_dataset.get_voxel_dim()
-	print gt_dataset.get_volume_dim()
+    print gt_dataset.get_voxel_dim()
+    print gt_dataset.get_volume_dim()
 
 
 def view_gt(path, slice_id):
 
-	gt_dataset = Dataset()
-	offset = (slice_id, 0, 0)
-	bounds_required = [1, 2000, 2000]
+    gt_dataset = Dataset()
+    offset = (slice_id, 0, 0)
+    bounds_required = [1, 2000, 2000]
 
-	im_data = load_to_array(path, offset, bounds_required)
-	gt_dataset.load_from_image_stack((8,8,8), im_data)
-	cells = gt_dataset.get_all_cells()
+    im_data = load_to_array(path, offset, bounds_required)
+    gt_dataset.load_from_image_stack((8,8,8), im_data)
+    cells = gt_dataset.get_all_cells()
 
-	label_dict = {cell_id : cells[cell_id].get_full_cell(membrane_only=True) for cell_id in cells.keys()}
-	im_array = np.squeeze(get_composite(label_dict, (1, 2000, 2000)))
-	im = Image.fromarray(im_array, 'RGB')
-	im.save('/home/jeremy/test.png')
+    label_dict = {cell_id : cells[cell_id].get_full_cell(membrane_only=True) for cell_id in cells.keys()}
+    im_array = np.squeeze(get_composite(label_dict, (1, 2000, 2000)))
+    im = Image.fromarray(im_array, 'RGB')
+    im.save('/home/jeremy/test.png')
 
 def get_psf():
-    sigma = gaussian_sigma(0.488, 0.488, 1.15, 1.33, 0.1, widefield = False, paraxial=False)
-    
-    print sigma
+    num_aperture = 1.15
+    refr_index = 1.33
+    pinhole_radius = 0.25
+
+    sigma = gaussian_sigma(0.488, 0.488, num_aperture, refr_index, pinhole_radius, widefield = False, paraxial=False)
+    shape = (int(4 * sigma[0] / 0.008), int(4 *  sigma[1] / 0.008))
+    dim = (shape[0] * 0.008, shape[1] * 0.008)
+    args = dict(shape=shape, dims=dim, ex_wavelen = 488, em_wavelen = 488,\
+     num_aperture=num_aperture, refr_index = refr_index, pinhole_radius = pinhole_radius, pinhole_shape = 'round')
+
+    psf_object = psf.PSF(psf.GAUSSIAN | psf.CONFOCAL | psf.PARAXIAL, **args)
+    #psf_object.imshow()
+    vol = psf_object.volume()
+    volume = np.array(vol[vol.shape[0] / 2:, :, :] * (2**64 - 1), np.float32)
+    imsave('/home/jeremy/volume.tiff', volume)
 
 #test_data_input("/home/jeremy/connectomics_data/ground_truth_original_format/Janelia/images")
 #view_gt("/home/jeremy/connectomics_data/ground_truth_original_format/Janelia/images", 0)

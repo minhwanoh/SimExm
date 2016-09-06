@@ -25,15 +25,15 @@ import numpy as np
 
 
 #Paths to db and original images
-original_images_path = "/home/jeremy/connectomics_data/ground_truth_original_format/Janelia/images"
+original_images_path = "/home/jeremy/janelia/ground_truth"
 #add other region stacks here. See database.lib.load_image_stack
 #synapses_images_path = ..
 #axon_images_path = ..
 
 #Parameters
 voxel_dim = (8, 8, 8) #Jenalia dataset
-bounds_wanted = (10, 500, 500) #depth, width, height of output stack
-offset = (2000, 1000, 1000) # (z, x, y) offset from which to load the images (crops the stack)
+bounds_wanted = (5, 500, 500) #depth, width, height of output stack
+offset = (0, 1000, 1000) # (z, x, y) offset from which to load the images (crops the stack)
 
 #Path to temporary db file for fast data loading (make sure to end with .hdf5)
 db_path = "/home/jeremy/allo.hdf5"

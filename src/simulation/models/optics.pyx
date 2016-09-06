@@ -11,7 +11,7 @@ import numpy as np
 cimport numpy as np
 from math import pi
 from src.database.models.dataset import Fluorset
-from src.simulation.psf import PSF
+import src.simulation.psf as psf
 from src.simulation._psf import gaussian_sigma
 
 ##################### OPTICS #####################
@@ -81,6 +81,28 @@ cdef class ConfocalUnit:
         self.laser_intensities = [(self.laser_power[i] * self.laser_percentage[i]) * 1.0 / (pi * (self.laser_radius) ** 2) for i in range(len(self.laser_power))]# [Watts / (m ^ 2)]
  
 
+    '''
+    cpdef object compute_parameters2(self, object voxel_dims, int expansion_factor, object bounds_wanted):
+        
+        Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
+        Gaussian approximation taken from "Gaussian Approximation offluorescence miscorcope point spread function models" by bo Zhang et al.
+
+        voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
+        expansion_facotr (int) : the expansion factor used in the simulation
+        bounds_wanted (tuple (z, x, y) int) : the desired width, height, and depth for the sim output
+        
+
+        self.scale_factor_xy  = <float> (voxel_dims[1] * self.objective_factor)  / <float> self.pixel_size
+        self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[0])
+        self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (2 * pi * self.numerical_aperture * voxel_dims[1]) for i in range(len(self.laser_wavelengths))]
+        self.std_dev_z  = [((0.78 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[0])  for i in range(len(self.laser_wavelengths))] #1.037
+        
+        cdef int depth_required = np.floor((8 * max(self.std_dev_z) + <float>(bounds_wanted[0] * self.z_offset_step)) /  <float> expansion_factor)
+        cdef int width_required = np.floor(bounds_wanted[1] * 1.0 / (self.scale_factor_xy * expansion_factor))
+        cdef int height_required = np.floor(bounds_wanted[2] * 1.0 / (self.scale_factor_xy * expansion_factor))
+        
+        return (depth_required, width_required, height_required)
+    '''
 
     cpdef object compute_parameters(self, object voxel_dims, int expansion_factor, object bounds_wanted):
         '''
@@ -91,11 +113,23 @@ cdef class ConfocalUnit:
         expansion_facotr (int) : the expansion factor used in the simulation
         bounds_wanted (tuple (z, x, y) int) : the desired width, height, and depth for the sim output
         '''
+        cdef float sigma_xy, sigma_z
+        self.std_dev_xy, self.std_dev_z, self.kernel_shape, self.kernel_dim = [], [], [], []
+
+        for i in range(self.num_channels):
+            (sigma_z, sigma_xy) = gaussian_sigma(self.laser_wavelengths[i] * 1e-3, self.laser_wavelengths[i] * 1e-3,\
+                                 self.numerical_aperture, 1.33, 0.25, widefield = False, paraxial=False)
+            sigma_z = sigma_z / (voxel_dims[0] * 1e-3)
+            sigma_xy = sigma_xy / (voxel_dims[1] * 1e-3)
+            self.std_dev_z.append(sigma_z)
+            self.std_dev_xy.append(sigma_xy)
+            kernel_shape = (int(8 * sigma_z / (voxel_dims[0] * 1e-3)), int(8 * sigma_xy / (voxel_dims[1] * 1e-3)))
+            self.kernel_shape.append(kernel_shape)
+            self.kernel_dim.append((kernel_shape[0] * voxel_dims[0], kernel_shape[1] * voxel_dims[1]))
 
         self.scale_factor_xy  = <float> (voxel_dims[1] * self.objective_factor)  / <float> self.pixel_size
         self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[0])
-        self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (2 * pi * self.numerical_aperture * voxel_dims[1]) for i in range(len(self.laser_wavelengths))]
-        self.std_dev_z  = [((0.78 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[0])  for i in range(len(self.laser_wavelengths))] #1.037
+        print self.std_dev_z
         cdef int depth_required = np.floor((8 * max(self.std_dev_z) + <float>(bounds_wanted[0] * self.z_offset_step)) /  <float> expansion_factor)
         cdef int width_required = np.floor(bounds_wanted[1] * 1.0 / (self.scale_factor_xy * expansion_factor))
         cdef int height_required = np.floor(bounds_wanted[2] * 1.0 / (self.scale_factor_xy * expansion_factor))
@@ -333,9 +367,9 @@ cdef class ConfocalUnit:
         cdef np.ndarray[np.float64_t, ndim=3] indices = np.indices((x, y), dtype=np.float64)
         cdef np.ndarray[np.float64_t, ndim=2] gaussian = np.exp(-((indices[0] - x_0)**2 / (2* sigma_x ** 2) + (indices[1] - y_0)**2 / (2* sigma_y ** 2)))
         return gaussian
-
-    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self, float sigma_x, float sigma_y, float sigma_z, int channel):
         '''
+    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel2(self, float sigma_x, float sigma_y, float sigma_z, int channel):
+        
         Creates point spread image with maximum magnitude 1
 
         Computes the 3d convolution kernel (point spread function of the micriscope). The std_values are used to bound the kernel toa size that 
@@ -345,7 +379,7 @@ cdef class ConfocalUnit:
         sigma_y (float) : y-std of the kernel
         sigma_z (float) : z-std of the kernel
         channel (int) : the channel to build the kernel based on
-        '''
+        
 
         cdef float x_0, y_0, z_0, w_0, z_r, size_z, size_r
         cdef int x, y, z, k
@@ -363,6 +397,20 @@ cdef class ConfocalUnit:
         kernel = (((w_0) / (w_z))**2) * np.exp(- 2 * ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
 
         return kernel
+        '''
+
+    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self, int channel):
+
+        shape = self.kernel_shape[channel]
+        dim = self.kernel_dim[channel]
+        args = dict(shape = self.kernel_shape[channel], dims = self.kernel_dim[channel], ex_wavelen = self.laser_wavelengths[channel],\
+         em_wavelen = self.laser_wavelengths[channel],  num_aperture=self.numerical_aperture, refr_index = 1.33, pinhole_radius = 0.25,\
+          pinhole_shape = 'round')
+        psf_object = psf.PSF(psf.GAUSSIAN | psf.CONFOCAL, **args)
+        #psf_object.imshow()
+        vol = psf_object.volume()
+        volume = np.array(vol[vol.shape[0] / 2:, :, :], np.float64)
+        return volume
 
     @cython.boundscheck(False)
     cdef np.ndarray[np.float64_t, ndim=2] project_photons(self,  long[:] Z, long[:] X, long[:] Y, unsigned int[:] photons, int z_offset, int channel, object dims):
@@ -380,7 +428,7 @@ cdef class ConfocalUnit:
         '''
 
         cdef long i, index, length, x, y, z, index_x, index_y
-        cdef np.ndarray[np.float64_t, ndim=3] kernel = self.get_convolutional_kernel(self.std_dev_xy[channel], self.std_dev_xy[channel], self.std_dev_z[channel], channel)
+        cdef np.ndarray[np.float64_t, ndim=3] kernel = self.get_convolutional_kernel(channel)
         cdef double[:,:] photon_slice = np.pad(np.zeros(dims, np.float64), (kernel.shape[1] / 2,), mode ='constant', constant_values = 0)  
         length = Z.size
         with nogil, parallel(num_threads=1):
