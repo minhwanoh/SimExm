@@ -21,7 +21,7 @@ The python dependencies can be found in the requirements.txt file. To install al
 
 or if from a virtual end:
 
-\'pip install -r requirements.txt'
+'pip install -r requirements.txt'
 
 ##Data
 
