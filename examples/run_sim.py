@@ -24,19 +24,21 @@ import numpy as np
 
 
 
-#Paths to db and original images
+#Paths to original images
 original_images_path = "/home/jeremy/janelia/ground_truth"
+
 #add other region stacks here. See database.lib.load_image_stack
 #synapses_images_path = ..
 #axon_images_path = ..
 
 #Parameters
 voxel_dim = (8, 8, 8) #Jenalia dataset
-bounds_wanted = (5, 500, 500) #depth, width, height of output stack
-offset = (0, 1000, 1000) # (z, x, y) offset from which to load the images (crops the stack)
+bounds_wanted = (1, 500, 500) #depth, width, height of output stack
+offset = (0, 1200, 1200) # (z, x, y) offset from which to load the images (crops the stack)
 
 #Path to temporary db file for fast data loading (make sure to end with .hdf5)
-db_path = "/home/jeremy/allo.hdf5"
+#Write your own location and make sure to update this file if updarting the bounds
+db_path = "/home/jeremy/allo5.hdf5"
 
 
 
@@ -76,16 +78,18 @@ laser_percentage   = [0.25, 0.25, 0.25]
 objective_back_aperture  = 1.0
 baseline = [50, 50, 50]
 filters = [[450, 550], [550, 625], [625, 950]]
-exposure_time  = 0.1
+exposure_time  = 0.1 seconds
 numerical_aperture  = 1.15
 objective_efficiency  = 0.8
 detector_efficiency  = 0.6
-focal_plane_depth  = 500
+focal_plane_depth  = 500 nm
 objective_factor  = 40.0
-pixel_size = 6500
+pixel_size = 6500 nm
+refractory_index = 1.33
+pinhole_radius = 0.55 um
 """
 
-optical_unit = ConfocalUnit(num_channels = 3, baseline = [0,0,0], numerical_aperture = 1.1)
+optical_unit = ConfocalUnit(num_channels = 3, baseline = [0, 0, 0])
 
 #Compute additional parameters, using the voxel_dim, the expansion factor and the wanted output bounds
 bounds_required = optical_unit.compute_parameters(voxel_dim, expansion_unit.get_expansion_factor(), bounds_wanted)
@@ -127,8 +131,8 @@ single_neuron = False
 print "Performing labeling simulation..."
 
 #Repeat this as many time as you'd like
-labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488'], labeling_density = 1, protein_density = 0.6, membrane_only = True)
-labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO550', 'ATTO647N'], labeling_density = 0.1, membrane_only = False)
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO425'], labeling_density = 1, protein_density = 0.001, antibody_amplification_factor = 10, membrane_only = True)
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO550', 'ATTO647N'], labeling_density = 0.5, protein_density = 0.0001, membrane_only = False)
 
 
 fluo_volume = labeling_unit.get_labeled_volume()
@@ -158,7 +162,7 @@ sim_stack = SimStack(sim_volume, sim_gt, sim_params)
 
 print "Saving results..."
 
-sim_name = "simulation1"
+sim_name = "simulation2"
 dest = "/home/jeremy/"
 
 #Save or view the sim_stack, can save as tiff, gif, image_sequence (see src.database.models.sim.SimStack)

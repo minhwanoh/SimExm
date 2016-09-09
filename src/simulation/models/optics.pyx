@@ -29,7 +29,7 @@ cdef class ConfocalUnit:
                     laser_percentage   = [0.25, 0.25, 0.25], objective_back_aperture  = 1.0, baseline = [30,30,30],\
                     filters = [[450, 550], [550, 625], [625, 950]], exposure_time  = 0.1 ,\
                     numerical_aperture  = 1.15, objective_efficiency  = 0.8, detector_efficiency  = 0.6,\
-                    focal_plane_depth  = 500, objective_factor  = 40.0, pixel_size = 6500):
+                    focal_plane_depth  = 500, objective_factor  = 40.0, pixel_size = 6500, refractory_index = 1.33, pinhole_radius = 0.55):
         '''
         Sets the initial parameters of the confocal unit.
 
@@ -76,63 +76,40 @@ cdef class ConfocalUnit:
         self.focal_plane_depth  = focal_plane_depth # [nm] thickness of each focus plane
         self.objective_factor  = objective_factor # magnification factor of objective lens
         self.pixel_size  = pixel_size # [nm] the width of each pixel
+        self.refractory_index = refractory_index #The refractory index of the specimen
+        self.pinhole_radius = pinhole_radius #Pinhole radius in um
 
         self.laser_radius = <float> self.objective_back_aperture /  <float> self.objective_factor
         self.laser_intensities = [(self.laser_power[i] * self.laser_percentage[i]) * 1.0 / (pi * (self.laser_radius) ** 2) for i in range(len(self.laser_power))]# [Watts / (m ^ 2)]
  
 
-    '''
-    cpdef object compute_parameters2(self, object voxel_dims, int expansion_factor, object bounds_wanted):
-        
-        Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
-        Gaussian approximation taken from "Gaussian Approximation offluorescence miscorcope point spread function models" by bo Zhang et al.
-
-        voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
-        expansion_facotr (int) : the expansion factor used in the simulation
-        bounds_wanted (tuple (z, x, y) int) : the desired width, height, and depth for the sim output
-        
-
-        self.scale_factor_xy  = <float> (voxel_dims[1] * self.objective_factor)  / <float> self.pixel_size
-        self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[0])
-        self.std_dev_xy = [(self.scale_factor_xy * self.laser_wavelengths[i]) / (2 * pi * self.numerical_aperture * voxel_dims[1]) for i in range(len(self.laser_wavelengths))]
-        self.std_dev_z  = [((0.78 * self.laser_wavelengths[i])) / ((self.numerical_aperture ** 2) *  voxel_dims[0])  for i in range(len(self.laser_wavelengths))] #1.037
-        
-        cdef int depth_required = np.floor((8 * max(self.std_dev_z) + <float>(bounds_wanted[0] * self.z_offset_step)) /  <float> expansion_factor)
-        cdef int width_required = np.floor(bounds_wanted[1] * 1.0 / (self.scale_factor_xy * expansion_factor))
-        cdef int height_required = np.floor(bounds_wanted[2] * 1.0 / (self.scale_factor_xy * expansion_factor))
-        
-        return (depth_required, width_required, height_required)
-    '''
-
     cpdef object compute_parameters(self, object voxel_dims, int expansion_factor, object bounds_wanted):
         '''
         Computes additional optics parameters given the size of a voxel, these are used throughout the imaging simulation.
         Gaussian approximation taken from "Gaussian Approximation offluorescence miscorcope point spread function models" by bo Zhang et al.
+        The gaussiam parameters are computed from the external psf library, courtesy of Christophe Golke
 
         voxel_dims ([int] 1 x 3) : size of a voxel in each of its 3 dimensions, in nm
         expansion_facotr (int) : the expansion factor used in the simulation
         bounds_wanted (tuple (z, x, y) int) : the desired width, height, and depth for the sim output
         '''
         cdef float sigma_xy, sigma_z
-        self.std_dev_xy, self.std_dev_z, self.kernel_shape, self.kernel_dim = [], [], [], []
+        self.std_dev_xy, self.std_dev_z = [], []
 
         for i in range(self.num_channels):
             (sigma_z, sigma_xy) = gaussian_sigma(self.laser_wavelengths[i] * 1e-3, self.laser_wavelengths[i] * 1e-3,\
-                                 self.numerical_aperture, 1.33, 0.25, widefield = False, paraxial=False)
-            sigma_z = sigma_z / (voxel_dims[0] * 1e-3)
-            sigma_xy = sigma_xy / (voxel_dims[1] * 1e-3)
+                                 self.numerical_aperture, self.refractory_index, self.pinhole_radius, # need to divide by magnification (see doc)\
+                                  widefield = False, paraxial=False)
+            sigma_z = 4 * sigma_z / (voxel_dims[0] * 1e-3) #Convert to pixels
+            sigma_xy = 4 * sigma_xy / (voxel_dims[1] * 1e-3)
             self.std_dev_z.append(sigma_z)
             self.std_dev_xy.append(sigma_xy)
-            kernel_shape = (int(8 * sigma_z / (voxel_dims[0] * 1e-3)), int(8 * sigma_xy / (voxel_dims[1] * 1e-3)))
-            self.kernel_shape.append(kernel_shape)
-            self.kernel_dim.append((kernel_shape[0] * voxel_dims[0], kernel_shape[1] * voxel_dims[1]))
 
         self.scale_factor_xy  = <float> (voxel_dims[1] * self.objective_factor)  / <float> self.pixel_size
         self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[0])
-        print self.std_dev_z
-        cdef int depth_required = np.floor((8 * max(self.std_dev_z) + <float>(bounds_wanted[0] * self.z_offset_step)) /  <float> expansion_factor)
-        cdef int width_required = np.floor(bounds_wanted[1] * 1.0 / (self.scale_factor_xy * expansion_factor))
-        cdef int height_required = np.floor(bounds_wanted[2] * 1.0 / (self.scale_factor_xy * expansion_factor))
+        cdef int depth_required = np.floor((4 * max(self.std_dev_z) + <float>(bounds_wanted[0] * self.z_offset_step)) /  <float> expansion_factor)
+        cdef int width_required = np.ceil(bounds_wanted[1] * 1.0 / (self.scale_factor_xy * expansion_factor))
+        cdef int height_required = np.ceil(bounds_wanted[2] * 1.0 / (self.scale_factor_xy * expansion_factor))
         
         return (depth_required, width_required, height_required)
 
@@ -180,8 +157,8 @@ cdef class ConfocalUnit:
         num_fluors_per_channel = np.array(num_fluors_per_channel, np.uint32)
 
         #Perform magnification
-        x = np.ceil(volume_dims[1] * self.scale_factor_xy)
-        y = np.ceil(volume_dims[2] * self.scale_factor_xy) 
+        x = np.floor(volume_dims[1] * self.scale_factor_xy)
+        y = np.floor(volume_dims[2] * self.scale_factor_xy) 
         X = np.floor(self.scale_factor_xy * X).astype(np.int64)
         Y = np.floor(self.scale_factor_xy * Y).astype(np.int64)
 
@@ -190,8 +167,8 @@ cdef class ConfocalUnit:
         photons = self.get_photon_count(num_fluors_per_channel, mean_photons_per_fluor)
 
         i = 0
-        start_index = np.ceil(4 * max(self.std_dev_z)) # We start with an offset of 4 times the maximum z-std
-        end_index = np.floor(volume_dims[0] - 4 * max(self.std_dev_z)) # End with the same offset
+        start_index = np.ceil(2 * max(self.std_dev_z)) # We start with an offset of 4 times the maximum z-std
+        end_index = np.floor(volume_dims[0] - 2 * max(self.std_dev_z)) # End with the same offset
         non_normalized_volume = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.float64) #Create empty volume
 
         #Populate volume
@@ -217,21 +194,21 @@ cdef class ConfocalUnit:
         (values, Z, X, Y) = volume_gt
 
         #Perform magnification
-        x = np.ceil(volume_dims[1] * self.scale_factor_xy)
-        y = np.ceil(volume_dims[2] * self.scale_factor_xy)
+        x = np.floor(volume_dims[1] * self.scale_factor_xy)
+        y = np.floor(volume_dims[2] * self.scale_factor_xy)
         X = np.floor(self.scale_factor_xy * X).astype(np.int64)
         Y = np.floor(self.scale_factor_xy * Y).astype(np.int64)
 
         #Create ground truth volume
         i = 0
-        start_index = np.ceil(4 * max(self.std_dev_z))
-        end_index = np.floor(volume_dims[0] - 4 * max(self.std_dev_z))
+        start_index = np.ceil(2 * max(self.std_dev_z))
+        end_index = np.floor(volume_dims[0] - 2 * max(self.std_dev_z))
         cdef np.ndarray[np.uint32_t, ndim = 3] ground_truth = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.uint32)
 
         #Populate volume
         for offset in range(start_index, end_index, self.z_offset_step):
             z_low = np.searchsorted(Z, offset, side = 'left')
-            z_high = np.searchsorted(Z, Z[z_low], side = 'right') - 1
+            z_high = np.searchsorted(Z, Z[z_low], side = 'right') - 1 if z_low < Z.size else z_low#Corner case
             ground_truth[i, X[z_low: z_high], Y[z_low: z_high]] = values[z_low: z_high]
             i += 1
 
@@ -251,11 +228,11 @@ cdef class ConfocalUnit:
         '''
 
         cdef int z_low, z_high, x , y
-        cdef np.ndarray[np.float64_t, ndim = 2] non_normalized
+        cdef np.ndarray[np.float64_t, ndim = 2] non_normalid
 
         (x, y) = (dims[0], dims[1])
-        z_low = np.searchsorted(Z, offset - 4 * self.std_dev_z[channel],  side = 'left')
-        z_high = np.searchsorted(Z, offset + 4 * self.std_dev_z[channel], side = 'right')
+        z_low = np.searchsorted(Z, offset - 2 * self.std_dev_z[channel],  side = 'left')
+        z_high = np.searchsorted(Z, offset + 2 * self.std_dev_z[channel], side = 'right')
         non_normalized = self.project_photons(Z[z_low: z_high], X[z_low: z_high], Y[z_low: z_high], photons[z_low: z_high], offset, channel, (x, y))
 
         #Resolve
@@ -367,50 +344,43 @@ cdef class ConfocalUnit:
         cdef np.ndarray[np.float64_t, ndim=3] indices = np.indices((x, y), dtype=np.float64)
         cdef np.ndarray[np.float64_t, ndim=2] gaussian = np.exp(-((indices[0] - x_0)**2 / (2* sigma_x ** 2) + (indices[1] - y_0)**2 / (2* sigma_y ** 2)))
         return gaussian
+
+    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self,  int channel):
         '''
-    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel2(self, float sigma_x, float sigma_y, float sigma_z, int channel):
-        
         Creates point spread image with maximum magnitude 1
 
         Computes the 3d convolution kernel (point spread function of the micriscope). The std_values are used to bound the kernel toa size that 
         allows to reach up to 4 times the std away from the center. Here only half is taken is z for quicker computation.
+        Uses the gaussian beam formula found here: https://en.wikipedia.org/wiki/Gaussian_Beam
+        The gaussiam parameters are computed from the external psf library, courtesy of Christophe Golke.
 
-        sigma_x (float) : x-std of the kernel
-        sigma_y (float) : y-std of the kernel
-        sigma_z (float) : z-std of the kernel
         channel (int) : the channel to build the kernel based on
-        
+        '''        
 
         cdef float x_0, y_0, z_0, w_0, z_r, size_z, size_r
         cdef int x, y, z, k
         cdef np.ndarray[np.float64_t, ndim=4] indices
         cdef np.ndarray[np.float64_t, ndim=3] kernel, w_z
 
+        #Compute size coefficient
         size_r = <float> self.pixel_size / <float>self.objective_factor
         size_z = np.ceil(<float> self.focal_plane_depth / <float> self.z_offset_step)
-        (x, y, z) = (8 * np.ceil(sigma_x) , 8 * np.ceil(sigma_y) , 4 * np.ceil(sigma_z))
+        
+        #Set bounds
+        (x, y, z) = (np.ceil(4 * self.std_dev_xy[channel]) , np.ceil(4 * self.std_dev_xy[channel]) , np.ceil(2 * self.std_dev_z[channel]))
         (x_0, y_0, z_0) = (<float>x / 2.0, <float>y / 2.0,  <float>0.0)
         indices = np.indices((z, x, y), dtype=np.float64)
+        
+        #Compute using gaussian beam formula
         w_0 =  <float>self.laser_wavelengths[channel] / (<float> pi * self.numerical_aperture)
         z_r = pi * ((w_0)**2) / <float>self.laser_wavelengths[channel]
         w_z = (w_0) * np.sqrt(1 + (size_z * (indices[0] - z_0) / z_r)**2)
-        kernel = (((w_0) / (w_z))**2) * np.exp(- 2 * ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
+        kernel = ((w_0) / (w_z))**2 * np.exp(-2 * ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
 
+        #Normalize
+        kernel = kernel / np.sum(kernel) 
+        
         return kernel
-        '''
-
-    cdef np.ndarray[np.float64_t, ndim=3] get_convolutional_kernel(self, int channel):
-
-        shape = self.kernel_shape[channel]
-        dim = self.kernel_dim[channel]
-        args = dict(shape = self.kernel_shape[channel], dims = self.kernel_dim[channel], ex_wavelen = self.laser_wavelengths[channel],\
-         em_wavelen = self.laser_wavelengths[channel],  num_aperture=self.numerical_aperture, refr_index = 1.33, pinhole_radius = 0.25,\
-          pinhole_shape = 'round')
-        psf_object = psf.PSF(psf.GAUSSIAN | psf.CONFOCAL, **args)
-        #psf_object.imshow()
-        vol = psf_object.volume()
-        volume = np.array(vol[vol.shape[0] / 2:, :, :], np.float64)
-        return volume
 
     @cython.boundscheck(False)
     cdef np.ndarray[np.float64_t, ndim=2] project_photons(self,  long[:] Z, long[:] X, long[:] Y, unsigned int[:] photons, int z_offset, int channel, object dims):
@@ -429,7 +399,8 @@ cdef class ConfocalUnit:
 
         cdef long i, index, length, x, y, z, index_x, index_y
         cdef np.ndarray[np.float64_t, ndim=3] kernel = self.get_convolutional_kernel(channel)
-        cdef double[:,:] photon_slice = np.pad(np.zeros(dims, np.float64), (kernel.shape[1] / 2,), mode ='constant', constant_values = 0)  
+        cdef double[:,:] photon_slice = np.zeros(dims, np.float64)
+        cdef double[:,:] padded_slice = np.pad(photon_slice, (kernel.shape[1] / 2,), mode ='constant', constant_values = 0)  
         length = Z.size
         with nogil, parallel(num_threads=1):
             for i in prange(length, schedule='dynamic'):
@@ -439,8 +410,12 @@ cdef class ConfocalUnit:
                     for y in range(kernel.shape[2]):
                         index_x = x + X[i]
                         index_y = y + Y[i]
-                        photon_slice[index_x, index_y] += kernel[z, x, y] * photons[i]
-        return np.array(photon_slice[kernel.shape[1] / 2: - kernel.shape[1] / 2, kernel.shape[2] / 2: - kernel.shape[2] / 2], np.float64)
+                        padded_slice[index_x, index_y] += kernel[z, x, y] * photons[i]
+
+        photon_slice[:,:] = padded_slice[kernel.shape[1] / 2 : kernel.shape[1] / 2 + photon_slice.shape[0],\
+                            kernel.shape[2] / 2 : kernel.shape[2] / 2 + photon_slice.shape[1]]
+
+        return np.array(photon_slice, np.float64)
 
     
     cdef np.ndarray[np.uint8_t, ndim=3] normalize(self, np.ndarray[np.float64_t, ndim=3] non_normalized):
@@ -450,7 +425,7 @@ cdef class ConfocalUnit:
         non_normalized (numpy Z x X x Y float) : the non_normalized volume of photons
         '''
 
-        cdef float the_max = max(<float> np.amax(non_normalized), 1)
+        cdef float the_max = <float> np.amax(non_normalized)
         cdef np.ndarray[np.float64_t, ndim=3] normalized = non_normalized * (255.0 / the_max)
         return np.array(np.floor(normalized), np.uint8)
 

@@ -8,19 +8,40 @@ The software is written in python with a few Cython extensions because why not ?
 
 #### Dependencies
 
+## Python 
+
+I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command above to install all the dependencies inside the environment. For instance, you can create a new evnironment "sim" by running:
+
+`conda create -n sim`
+
+Which will modify the PYTHONPATH so that all futute programs installed through pip end up in the same virtual environment.
 The python dependencies can be found in the requirements.txt file. To install all at once, from the terminal, do:
 
 `sudo pip install -r requirements.txt`  
 
-I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command to install all the dependencies inside the environment.
+or if from a virtual end:
+
+\'pip install -r requirements.txt'
+
+##Data
+
+The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
+
+`for i  in {2000..4000}
+do 
+    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i -O destination_path/ground_truth/bodies-xy-$i.png
+done`
+
+Make sure to indicate an accessible destination path for the images
 
 #### Compiling
 
 Once all the dependencies have been correctly installed, run:  
 
-`make install` 
+`make install` or `make clean; make build`
 
-which will compile the extensions. Make sure to have a look at the Makefile for useful commands.
+which will cclean out the project, ompile the cython cytextensions (labeling, optics and expansion units).
+Make sure to have a look at the Makefile for useful commands.
 
 ##Basic Usage
 
@@ -32,17 +53,8 @@ The simulation is run through simple scripts. There are four steps to a SimExm s
 3. Saving, or visualizing the simulated output.
 
 An example script can be found here: ./scripts/run_sim.py
-
 Make sure to check it out to get a better understanding of how to build a sim script.
-
-Alternatively you can use the the IPython Notebooks which can be found in ./notebooks. 
-To start the notebooks:
-
-`cd ./notebooks; jupyter notebook` 
-
-or: 
-
-`make notebook`
+The file run_sim,py can be quickly called using make run.
 
 
 

@@ -52,13 +52,13 @@ cdef class ConfocalUnit:
     cdef object laser_intensities
     cdef object std_dev_xy
     cdef object std_dev_z
-    cdef object kernel_shape
-    cdef object kernel_dim
     cdef int z_offset_step
     cdef float scale_factor_xy
     cdef int focal_plane_depth
     cdef float objective_factor
     cdef int pixel_size
+    cdef float refractory_index
+    cdef float pinhole_radius
 
 
     cpdef object compute_parameters(self, object voxel_dims, int expansion_factor, object bounds_wanted)

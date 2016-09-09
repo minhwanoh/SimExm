@@ -177,7 +177,7 @@ class Dataset:
         membrane_indices = np.zeros(voxel_list.shape[0], np.bool)
         for i in range(voxel_list.shape[0]):
             (z, x, y) = voxel_list[i, :]
-            membrane_indices[i] = np.unique(cell_stack[z, x - 1 : x + 2, y - 1 : y + 2]).size > 1
+            membrane_indices[i] = np.unique(cell_stack[z - 1 : z + 2, x - 1 : x + 2, y - 1 : y + 2]).size > 1
 
         membrane_list = voxel_list[membrane_indices, :]
 
