@@ -8,8 +8,6 @@ The software is written in python with a few Cython extensions because why not ?
 
 #### Dependencies
 
-## Python 
-
 I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command above to install all the dependencies inside the environment. For instance, you can create a new evnironment "sim" by running:
 
 `conda create -n sim`
@@ -21,15 +19,15 @@ The python dependencies can be found in the requirements.txt file. To install al
 
 or if from a virtual end:
 
-'pip install -r requirements.txt'
+`pip install -r requirements.txt`
 
-##Data
+#### Dataset
 
 The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
 
 `for i  in {2000..4000}
 do 
-    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i -O destination_path/ground_truth/bodies-xy-$i.png
+    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$ destination_path/ground_truth/bodies-xy-$i.png
 done`
 
 Make sure to indicate an accessible destination path for the images
