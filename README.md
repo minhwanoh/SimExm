@@ -25,10 +25,12 @@ or if from a virtual end:
 
 The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
 
-`for i  in {2000..4000}
-do 
-    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$ destination_path/ground_truth/bodies-xy-$i.png
-done`
+`
+for i  in {2000..4000}  
+do  
+    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$   destination_path/ground_truth/bodies-xy-$i.png  
+done
+`
 
 Make sure to indicate an accessible destination path for the images
 
@@ -38,7 +40,7 @@ Once all the dependencies have been correctly installed, run:
 
 `make install` or `make clean; make build`
 
-which will cclean out the project, ompile the cython cytextensions (labeling, optics and expansion units).
+which will clean out the project, compile the cython extensions (labeling, optics and expansion units).
 Make sure to have a look at the Makefile for useful commands.
 
 ##Basic Usage
@@ -47,12 +49,12 @@ The simulation is run through simple scripts. There are four steps to a SimExm s
 
 1. Creating the ground_truth object, the labeling, expansion and optics units.
 2. Choosing labeling parameters and running the labeling simulation.
-2. Running the imaging simulation.
+2. Running the expansion and imaging simulation.
 3. Saving, or visualizing the simulated output.
 
 An example script can be found here: ./scripts/run_sim.py
 Make sure to check it out to get a better understanding of how to build a sim script.
-The file run_sim,py can be quickly called using make run.
+The file run_sim,py can be quickly called using `make run`.
 
 
 
