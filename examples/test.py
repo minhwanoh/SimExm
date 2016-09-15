@@ -55,18 +55,21 @@ def view_gt(path, slice_id):
 def get_psf():
     num_aperture = 1.15
     refr_index = 1.33
-    pinhole_radius = 0.25
+    pinhole_radius = 0.55 / 40.0
 
-    sigma = gaussian_sigma(0.488, 0.488, num_aperture, refr_index, pinhole_radius, widefield = False, paraxial=False)
-    shape = (int(4 * sigma[0] / 0.008), int(4 *  sigma[1] / 0.008))
-    dim = (shape[0] * 0.008, shape[1] * 0.008)
-    args = dict(shape=shape, dims=dim, ex_wavelen = 488, em_wavelen = 488,\
-     num_aperture=num_aperture, refr_index = refr_index, pinhole_radius = pinhole_radius, pinhole_shape = 'round')
+    sigma = gaussian_sigma(0.488, 0.520, num_aperture, refr_index, pinhole_radius, widefield=False , paraxial = False)
+    shape = (int(8 * sigma[0] / 0.008), int(8 *  sigma[1] / 0.008))
+    dim = (shape[0] * 0.032, shape[1] * 0.032)
+    args = dict(shape=shape, dims=dim, ex_wavelen = 488, em_wavelen = 520,\
+     num_aperture=num_aperture, refr_index = refr_index, pinhole_radius = pinhole_radius, pinhole_shape = 'round', magnification = 40.0)
 
-    psf_object = psf.PSF(psf.GAUSSIAN | psf.CONFOCAL | psf.PARAXIAL, **args)
-    #psf_object.imshow()
+    psf_object = psf.PSF(psf.ISOTROPIC | psf.CONFOCAL, **args)
+
     vol = psf_object.volume()
-    volume = np.array(vol[vol.shape[0] / 2:, :, :] * (2**64 - 1), np.float32)
+    (Z, X, Y) = np.nonzero(vol)
+    volume = vol.astype(np.uint32)
+    #volume[Z, X, Y] =  vol[Z, X, Y]
+
     imsave('/home/jeremy/volume.tiff', volume)
 
 #test_data_input("/home/jeremy/connectomics_data/ground_truth_original_format/Janelia/images")

@@ -50,8 +50,8 @@ cdef class ConfocalUnit:
     cdef float detector_efficiency 
     cdef object laser_radius
     cdef object laser_intensities
-    cdef object std_dev_xy
-    cdef object std_dev_z
+    cdef object w_max
+    cdef object z_max
     cdef int z_offset_step
     cdef float scale_factor_xy
     cdef int focal_plane_depth
@@ -80,7 +80,7 @@ cdef class ConfocalUnit:
     cdef np.ndarray[np.uint32_t, ndim = 1] get_photon_count(self, np.ndarray[np.uint32_t, ndim=2] num_fluors_per_channel,\
      np.ndarray[np.uint32_t, ndim=1] mean_detected_photons)
 
-    cdef np.ndarray[np.float64_t, ndim=2] get_baseline_image(self, int x, int y, int channel)
+    cdef np.ndarray[np.uint8_t, ndim=3] get_baseline_volume(self, object volume_dim, int channel)
 
     cdef np.ndarray[np.float64_t, ndim=2] get_2dgaussian_kernel(self, int x, int y, float sigma_x, float sigma_y)
 

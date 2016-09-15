@@ -15,7 +15,6 @@ from src.database.models.sim import SimStack, SimParams
 from src.simulation.models.expansion import ExpansionUnit
 from src.simulation.models.labeling import BrainbowUnit
 from src.simulation.models.optics import ConfocalUnit
-from PIL import Image
 import numpy as np
 
 
@@ -33,12 +32,12 @@ original_images_path = "/home/jeremy/janelia/ground_truth"
 
 #Parameters
 voxel_dim = (8, 8, 8) #Jenalia dataset
-bounds_wanted = (1, 500, 500) #depth, width, height of output stack
+bounds_wanted = (30, 500, 500) #depth, width, height of output stack
 offset = (0, 1200, 1200) # (z, x, y) offset from which to load the images (crops the stack)
 
 #Path to temporary db file for fast data loading (make sure to end with .hdf5)
 #Write your own location and make sure to update this file if updarting the bounds
-db_path = "/home/jeremy/allo5.hdf5"
+db_path = "/home/jeremy/allo6.hdf5"
 
 
 
@@ -89,7 +88,7 @@ refractory_index = 1.33
 pinhole_radius = 0.55 um
 """
 
-optical_unit = ConfocalUnit(num_channels = 3, baseline = [0, 0, 0])
+optical_unit = ConfocalUnit(num_channels = 3, baseline = [80, 80, 50])
 
 #Compute additional parameters, using the voxel_dim, the expansion factor and the wanted output bounds
 bounds_required = optical_unit.compute_parameters(voxel_dim, expansion_unit.get_expansion_factor(), bounds_wanted)
@@ -131,8 +130,7 @@ single_neuron = False
 print "Performing labeling simulation..."
 
 #Repeat this as many time as you'd like
-labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO425'], labeling_density = 1, protein_density = 0.001, antibody_amplification_factor = 10, membrane_only = True)
-labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO550', 'ATTO647N'], labeling_density = 0.5, protein_density = 0.0001, membrane_only = False)
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488', 'ATTO550', 'ATTO647N'], labeling_density = 0.2, protein_density = 0.001, membrane_only = False)
 
 
 fluo_volume = labeling_unit.get_labeled_volume()

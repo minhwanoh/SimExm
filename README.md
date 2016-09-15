@@ -25,6 +25,7 @@ or if from a virtual end:
 
 ##Data
 
+I'm working on getting better ground truth data. In the mean time I use a dataset from the Janelia group, whichnunfortuntaly seems to contain erros in annotation.
 The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
 
 `for i  in {2000..4000}
