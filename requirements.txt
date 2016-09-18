@@ -2,7 +2,6 @@ Cython
 jupyter  
 ipywidgets
 matplotlib
-numpy
 Pillow 
 scipy
 tifffile
