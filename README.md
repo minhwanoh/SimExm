@@ -31,12 +31,12 @@ or if you didn't  use a virtual environment:
 I'm working on getting better ground truth data. In the mean time I use a dataset from the Janelia group, whichn unfortuntaly seems to contain erros in annotation.
 The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
 
-`
+```
 for i  in {2000..4000}  
 do  
-    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$   destination_path/ground_truth/bodies-xy-$i.png  
+    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i -0 destination_path/ground_truth/bodies-xy-$i.png  
 done
-`
+```
 
 Make sure to indicate an writable destination path for the images.
 

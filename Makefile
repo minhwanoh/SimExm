@@ -1,6 +1,6 @@
 clean:
 	rm -rf ./build;
-	find ./simulation/models -iname "*.c" -exec rm {} \;
+	find ./src/simulation/models -iname "*.c" -exec rm {} \;
 	find . -iname "*.o" -exec rm {} \;
 	find . -iname "*.so" -exec rm {} \;
 
