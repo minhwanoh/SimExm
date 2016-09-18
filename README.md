@@ -1,7 +1,7 @@
 # SimExm
 A set of tools to simulate expansion microscopy experiments under different labeling and imaging conditions. 
 
-The software is written in python with a few Cython extensions because why not ? Cython extensions require to be compiled. After installing the python dependencies you will compile the extensions using a make command as explained below. The following section covers basic usage of SimExm.
+The software is written in python with a few Cython extensions because why not ? Cython extensions require to be compiled. After installing the python dependencies you will compile the extensions using a make command as explained below. The following section covers basic installation and usage of SimExm.
 
 
 ##Installation
@@ -9,7 +9,7 @@ The software is written in python with a few Cython extensions because why not ?
 #### Dependencies
 
 The code works in python2 exclusivly. It should be easy to convert to python3 but it's untested.
-I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command above to install all the dependencies inside the environment. For instance, you can create a new evnironment "sim" by running:
+I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command above to install all the dependencies inside the environment. For instance, you can create a new environment "sim" by running:
 
 `conda create -n sim python`
 
@@ -28,7 +28,7 @@ or if you didn't  use a virtual environment:
 
 #### Dataset
 
-I'm working on getting better ground truth data. In the mean time I use a dataset from the Janelia group, whichn unfortuntaly seems to contain erros in annotation.
+I'm working on getting better ground truth data. In the mean time I use a dataset from the Janelia group, which unfortuntaly seems to contain erros of annotation. It is, however, good enough for the purpose of these simulations.
 The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
 
 ```
@@ -38,7 +38,7 @@ do
 done
 ```
 
-Make sure to indicate an writable destination path for the images.
+Make sure to indicate a writable destination path for the images.
 
 #### Compiling
 
@@ -51,12 +51,14 @@ Make sure to have a look at the Makefile for useful commands.
 
 ##Basic Usage
 
-The simulation is run through simple scripts. There are four steps to a SimExm script:  
+The simulation is run through simple scripts. There are 6 steps to a SimExm script:  
 
-1. Creating the ground_truth object, the labeling, expansion and optics units.
-2. Choosing labeling parameters and running the labeling simulation.
-2. Running the expansion and imaging simulation.
-3. Saving, or visualizing the simulated output.
+1. Creating the ground_truth dataset object, as well as the labeling, 
+2. Create the expansion and optics units and specify parameters.
+3. Fill up the ground truth dataset object with data from a saved file or by loading from the images.
+4. Choosing labeling parameters and running the labeling simulation.
+5. Running the expansion and imaging simulation.
+6. Saving, or visualizing the simulated output.
 
 An example script can be found here: ./scripts/run_sim.py
 Make sure to check it out to get a better understanding of how to build a sim script.
