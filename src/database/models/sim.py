@@ -6,7 +6,7 @@ The Simstack and SimParam class.
 '''
 
 import sys
-sys.path.imsert(0, "../")
+sys.path.insert(0, "../")
 from images2gif import writeGif
 from tifffile import imsave
 from PIL import Image

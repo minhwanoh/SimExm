@@ -130,7 +130,7 @@ single_neuron = False
 print "Performing labeling simulation..."
 
 #Repeat this as many time as you'd like
-labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488', 'ATTO550', 'ATTO647N'], labeling_density = 0.2, protein_density = 0.001, membrane_only = False)
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488', 'ATTO550', 'ATTO647N'], labeling_density = 0.2, protein_density = 0.001, membrane_only = True)
 
 
 fluo_volume = labeling_unit.get_labeled_volume()
