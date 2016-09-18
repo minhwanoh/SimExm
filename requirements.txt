@@ -1,9 +1,9 @@
+numpy
 Cython   
 jupyter  
 ipywidgets
 matplotlib
 Pillow 
 scipy
-tifffile
 images2gif
 h5py

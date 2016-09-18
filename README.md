@@ -18,13 +18,8 @@ To start your new environment and activate the change of path run:
 
 `source activate sim` 
 
-All dependencies currently used are: numpy, Cython, jupyter, ipywidgets, matplotlib, Pillow, scipy, tifffile, images2gif,and h5py.  
-You first need to install numpy separatly:
-
-`pip install numpy`
-
-Once numpy has been installed correctly, you can install the rest of the dependencies located in requirements.txt.
-.To install all at once, from the terminal, do:
+All dependencies currently used are: numpy, Cython, jupyter, ipywidgets, matplotlib, Pillow, scipy, images2gif,and h5py. 
+To install all at once, from the terminal, do:
 
 `pip install -r requirements.txt`  
 
