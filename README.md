@@ -60,7 +60,7 @@ The simulation is run through simple scripts. There are 6 steps to a SimExm scri
 5. Running the expansion and imaging simulation.
 6. Saving, or visualizing the simulated output.
 
-An example script can be found here: ./scripts/run_sim.py
+An example script can be found here: ./examples/run_sim.py
 Make sure to check it out to get a better understanding of how to build a sim script.
 The file run_sim,py can be quickly called using `make run`.
 
