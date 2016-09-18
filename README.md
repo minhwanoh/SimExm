@@ -1,29 +1,34 @@
 # SimExm
 A set of tools to simulate expansion microscopy experiments under different labeling and imaging conditions. 
 
-The software is written in python with a few Cython extensions because why not ? Cython extensions require to be compiled. After installing the python dependencies you will compile the extensions use a make command as explained below. The following section covers basic usage of SimExm.
+The software is written in python with a few Cython extensions because why not ? Cython extensions require to be compiled. After installing the python dependencies you will compile the extensions using a make command as explained below. The following section covers basic usage of SimExm.
 
 
 ##Installation
 
 #### Dependencies
 
+The code works in python2 exclusivly. It should be easy to convert to python3 but it's untested.
 I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command above to install all the dependencies inside the environment. For instance, you can create a new evnironment "sim" by running:
 
-`conda create -n sim`
+`conda create -n sim python`
 
 Which will modify the PYTHONPATH so that all futute programs installed through pip end up in the same virtual environment.
+To start your new environment and activate the change of path run: 
+
+`source activate sim` 
+
 The python dependencies can be found in the requirements.txt file. To install all at once, from the terminal, do:
 
-`sudo pip install -r requirements.txt`  
+`pip install -r requirements.txt`  
 
-or if from a virtual end:
+or if you didn't  use a virtual environment:
 
-`pip install -r requirements.txt`
+`sudo pip install -r requirements.txt`
 
 #### Dataset
 
-I'm working on getting better ground truth data. In the mean time I use a dataset from the Janelia group, whichnunfortuntaly seems to contain erros in annotation.
+I'm working on getting better ground truth data. In the mean time I use a dataset from the Janelia group, whichn unfortuntaly seems to contain erros in annotation.
 The data can be downloaded from : emdata.janelia.org. The following command, downloads labeled images from slice 2000 to 4000:
 
 `
@@ -33,7 +38,7 @@ do
 done
 `
 
-Make sure to indicate an accessible destination path for the images
+Make sure to indicate an writable destination path for the images.
 
 #### Compiling
 
