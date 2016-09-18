@@ -32,12 +32,12 @@ original_images_path = "/home/jeremy/janelia/ground_truth"
 
 #Parameters
 voxel_dim = (8, 8, 8) #Jenalia dataset
-bounds_wanted = (30, 500, 500) #depth, width, height of output stack
+bounds_wanted = (100, 500, 500) #depth, width, height of output stack
 offset = (0, 1200, 1200) # (z, x, y) offset from which to load the images (crops the stack)
 
 #Path to temporary db file for fast data loading (make sure to end with .hdf5)
 #Write your own location and make sure to update this file if updarting the bounds
-db_path = "/home/jeremy/allo6.hdf5"
+db_path = "/home/jeremy/allo" + str(bounds_wanted) + ".hdf5"
 
 
 
