@@ -9,7 +9,6 @@ import cython
 import numpy as np
 cimport numpy as np
 
-##################### OPTICS #####################
 
 cdef class ConfocalUnit:
     '''
@@ -60,7 +59,7 @@ cdef class ConfocalUnit:
     cdef float refractory_index
     cdef float pinhole_radius
 
-
+    #Methods
     cpdef object compute_parameters(self, object voxel_dims, int expansion_factor, object bounds_wanted)
 
     cpdef object resolve_volume(self, object volume, object volume_dims, object fluors)

@@ -5,12 +5,12 @@ The Fluorophore class and a subclass for each type (for easy data access and sto
 
 '''
 
+
 import os
 import numpy as np
 
 
 class Fluorophore:
-
     '''
     Interface to interace with a fluorophore's data.
     Instances of the FLuorohore class are used to enumerate fluorophore parameters,
@@ -27,7 +27,6 @@ class Fluorophore:
     source (string) : Source where the data can be obtained / verified
     comments (string) : Additonal comments for the user 
     '''
-
     name = ""
     xls = ""
     quantum_yield = 0.0
@@ -37,34 +36,29 @@ class Fluorophore:
     source = ""
     comments = ""
 
-    def get_name(self):
-        ''' Returns the (string) type of the fluoropore '''
 
+    def get_name(self):
+        '''Returns the (string) type of the fluoropore'''
         return self.name
 
     def get_quantum_yield(self):
-        ''' Returns the (float) quantum yield of the fluorophore '''
-
+        '''Returns the (float) quantum yield of the fluorophore'''
         return float(self.quantum_yield)
 
     def get_extinction_coefficient(self):
-        ''' Returns the (float) extinction coefficient of the fluorophore '''
-
+        '''Returns the (float) extinction coefficient of the fluorophore'''
         return float(self.extinction_coefficient)
 
     def get_source(self):
-        '''Returns the (string) source, where information about the flurophore can be found '''
-
+        '''Returns the (string) source, where information about the flurophore can be found'''
         return self.source
 
     def get_comments(self):
-        ''' Returns (string) comments, addional information about the fluorophore '''
-
+        '''Returns (string) comments, addional information about the fluorophore'''
         return self.comments
 
     def get_emission_file(self):
-        ''' Returns emission data as a float numpy array '''
-
+        '''Returns emission data as a float numpy array'''
         file_path = self.emission
         f = open(file_path, 'r')
         raw_data = f.read().split("\r")
@@ -72,8 +66,7 @@ class Fluorophore:
         return raw_data
 
     def get_excitation_file(self):
-        ''' Returns excitation data as a float numpy array '''
-
+        '''Returns excitation data as a float numpy array'''
         file_path = self.excitation
         f = open(file_path, 'r')
         raw_data = f.read().split("\r")
@@ -86,7 +79,6 @@ class Fluorophore:
 
         wavelenght (int) : value in nm
         '''
-
         raw_data = self.get_excitation_file()
         data     = raw_data[:,1] / np.max(raw_data[:,1])
         data_min = np.min(raw_data[:,0])
@@ -110,7 +102,6 @@ class Fluorophore:
         wavelenght_min (int) : minimum value in nm
         wavelenght_max (int) : maximum value in nm
         '''
-
         raw_data = self.get_emission_file()
         data     = raw_data[:,1] / np.sum(raw_data[:,1])
         interval = round(np.mean(np.diff(raw_data[:,0])),2)
@@ -131,11 +122,13 @@ class Fluorophore:
 
         return emission
 
+
 #Path to data
 fluo_path = os.path.abspath(os.path.dirname(__file__)) + '/../fluordata/'
 
 # List of fluorophores in database, as FLuorophore objects
 # Alexa DYES
+
 
 class Alexa350(Fluorophore):
 
@@ -148,6 +141,7 @@ class Alexa350(Fluorophore):
     source = "https://www.thermofisher.com/us/en/home/references/molecular-probes-the-handbook/fluorophores-and-their-amine-reactive-derivatives/alexa-fluor-dyes-spanning-the-visible-and-infrared-spectrum.html"
     comments = "The quantum yeild value is a guess, the actual figure is not provided."
 
+
 class Alexa790(Fluorophore):
 
     name = "Alexa790"
@@ -159,7 +153,9 @@ class Alexa790(Fluorophore):
     source = "https://www.thermofisher.com/us/en/home/references/molecular-probes-the-handbook/fluorophores-and-their-amine-reactive-derivatives/alexa-fluor-dyes-spanning-the-visible-and-infrared-spectrum.html"
     comments = "The quantum yeild value is a guess, the actual figure is not provided."
 
+
 # ATTO DYES
+
 
 class ATTO390(Fluorophore):
 
@@ -172,6 +168,7 @@ class ATTO390(Fluorophore):
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_390.pdf"
     comments = ""
 
+
 class ATTO425(Fluorophore):
 
     name = "ATTO425"
@@ -182,6 +179,7 @@ class ATTO425(Fluorophore):
     quantum_yield = 0.9 
     source = "http://www.atto-tec.com/fileadmin/user_upload/Produktdatenblaetter/ATTO_425.pdf"
     comments = ""
+
 
 class ATTO430LS(Fluorophore):
 
@@ -194,6 +192,7 @@ class ATTO430LS(Fluorophore):
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_430LS.pdf"
     comments = ""
 
+
 class ATTO465(Fluorophore):
 
     name = "ATTO465"
@@ -204,6 +203,7 @@ class ATTO465(Fluorophore):
     quantum_yield = 0.75 
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_465.pdf"
     comments = ""
+
 
 class ATTO488(Fluorophore):
 
@@ -216,6 +216,7 @@ class ATTO488(Fluorophore):
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_488.pdf"
     comments = ""
 
+
 class ATTO490LS(Fluorophore):
 
     name = "ATTO490LS"
@@ -226,6 +227,7 @@ class ATTO490LS(Fluorophore):
     quantum_yield = 0.3 
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_490LS.pdf"
     comments = ""
+
 
 class ATTO550(Fluorophore):
 
@@ -238,6 +240,7 @@ class ATTO550(Fluorophore):
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_550.pdf"
     comments = ""
 
+
 class ATTO647N(Fluorophore):
 
     name = "ATTO647N"
@@ -248,6 +251,7 @@ class ATTO647N(Fluorophore):
     quantum_yield = 0.65 
     source = "http://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/ATTO_647N.pdf"
     comments = ""
+
 
 class ATTO700(Fluorophore):
 

@@ -11,6 +11,7 @@ from PIL import Image
 import numpy as np
 import json
 
+
 class SimStack:
     '''
     Handles simulation outputs. Saves to gif, image_sequence (png) or tiff stack.
@@ -24,7 +25,6 @@ class SimStack:
         ground_truth (numpy Z x X x Y, uint32 ) : the simulation ground truth output
         sim_params (SimParams) : an instance of the SimParams class, which helps deal with parameter file
         '''
-
         self.image_sequence = [np.squeeze(image_volume[i, :, :, :]) for i in range(image_volume.shape[0])]
         self.ground_truth = [np.squeeze(ground_truth[i, :, :]) for i in range(ground_truth.shape[0])]
         self.num_channels = image_volume.shape[3]
@@ -39,7 +39,6 @@ class SimStack:
 
         num (int) : number of empty channels to add to each image
         '''
-
         (x, y, c) = self.image_sequence[0].shape
         empty = np.zeros((x, y, num), np.uint8)
         for i in range(len(self.image_sequence)):
@@ -54,7 +53,6 @@ class SimStack:
         path (string) : the destination folder
         name (string) : the name of the file
         '''
-
         if path[-1] != "/":
             path += "/"
         writeGif(path + name + ".gif", self.image_sequence, duration=0.5)
@@ -68,7 +66,6 @@ class SimStack:
         path (string) : the destination folder
         name (string) : the name of the file
         '''
-
         if path[-1] != "/":
             path += "/"
         for i in range(len(self.image_sequence)):
@@ -96,7 +93,6 @@ class SimStack:
 
 
 class SimParams:
-
     '''
     A class to store simulation parameters
     '''
@@ -111,7 +107,6 @@ class SimParams:
         optics_params (dict) : dictionary from parameter to value
         expansion_params (dict) : dictionary from parameter to value
         '''
-
         self.volume_dim = volume_dim
         self.gt_params = gt_params
         self.labeling_params = labeling_params
@@ -119,14 +114,12 @@ class SimParams:
         self.expansion_params = expansion_params
 
     def save(self, path, name):
-
         '''
         Save image sequence as multi-page tiff stack
 
         path (string) : the destination folder
         name (string) : the name of the file
         '''
-
         if path[-1] != "/": path += "/"
 
         pre_expansion_space_voxel_dim = [self.optics_params['pixel_size'] / self.optics_params['objective_factor'],\

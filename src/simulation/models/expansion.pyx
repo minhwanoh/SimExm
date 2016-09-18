@@ -9,11 +9,9 @@ cimport numpy as np
 
 
 cdef class ExpansionUnit:
-    
     '''
     Unit performing the expansion step of the simulation. Works by multiplying the cooridnates by the expansion factor.
     Some variability is attained by distirbuting fluorophores accross the expanded voxels
-
     '''
 
     def __cinit__(self, expansion_factor):
@@ -22,12 +20,10 @@ cdef class ExpansionUnit:
 
         expansion_factor (int) : the expansion factor to use, currently requires an integer
         '''
-
         self.expansion_factor = expansion_factor 
 
     cpdef int get_expansion_factor(self):
         ''' Returns the expansion factor of the unit '''
-
         return self.expansion_factor
 
     cpdef object expand_volume(self, np.ndarray[np.uint32_t, ndim=4] fluo_volume):
@@ -36,7 +32,6 @@ cdef class ExpansionUnit:
 
         fluo_volume (fluorophore x Z x X x Y numpy array, uint32) : the volume to expand
         '''
-
         cdef np.ndarray[np.uint32_t, ndim=2] number_per_fluor
         (colors, Z, X, Y) = np.nonzero(fluo_volume)
         number_per_fluor = fluo_volume[:, Z, X, Y]
@@ -53,7 +48,6 @@ cdef class ExpansionUnit:
 
         fluo_volume_gt (Z x X x Y numpy array, uint32) : the ground truth volume to expand
         '''
-
         (Z, X, Y) = np.nonzero(fluo_gt_volume)
         values = fluo_gt_volume[Z, X, Y]
         newX = self.expansion_factor * X
@@ -64,6 +58,5 @@ cdef class ExpansionUnit:
         return (values[indices], newZ[indices], newX[indices], newY[indices])
 
     cpdef object get_parameters(self):
-        ''' Returns dictionary containing the expansion parameters '''
-        
+        '''Returns dictionary containing the expansion parameters'''
         return { 'expansion_factor' : self.expansion_factor }

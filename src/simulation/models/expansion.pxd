@@ -9,7 +9,6 @@ cimport numpy as np
 
 
 cdef class ExpansionUnit:
-    
     '''
     Unit performing the expansion step of the simulation. Works by multiplying the cooridnates by the expansion factor.
     Some variability is attained by distirbuting fluorophores accross the expanded voxels
@@ -21,7 +20,6 @@ cdef class ExpansionUnit:
     cdef int expansion_factor
 
     #Methods
-
     cpdef int get_expansion_factor(self)
 
     cpdef object expand_volume(self, np.ndarray[np.uint32_t, ndim=4] fluo_volume)

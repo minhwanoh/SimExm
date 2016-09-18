@@ -3,9 +3,11 @@ lib.py
 
 Library for the database module
 '''
+
 import os
 import numpy as np
 from scipy.misc import imread, imshow
+
 
 def load_to_array(image_path, offset, bounds):
     '''
@@ -17,7 +19,6 @@ def load_to_array(image_path, offset, bounds):
     offset (tuple (z, x, y)) : the top left of the output stack
     bounds (tuple (depth, wdith, height)) : the size to crop from the image stack
     '''
-
     if image_path[-1] != '/': image_path += '/'
     try:
         os.remove(image_path + '.DS_Store')
@@ -41,6 +42,7 @@ def load_to_array(image_path, offset, bounds):
 
     return im_data
 
+
 def get_composite(cell_dict, dim, max_number_cell = None):
     ''' 
     Create composite from list of neurons in a given volume. Can be useful to visualize ground truth data.
@@ -50,7 +52,6 @@ def get_composite(cell_dict, dim, max_number_cell = None):
     dim (tuple) : the (z, x, y) dimension of the volume that the cells reside in
     max_number_cell (int) : if set, limits the number of cell displayed to this number
     '''
-
     cell_ids = cell_dict.keys()
     (z, x, y) = dim
     volume = np.zeros((z, x, y, 3), np.uint8)

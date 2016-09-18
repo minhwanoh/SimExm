@@ -7,6 +7,7 @@ The BrainbowUnit class
 import numpy as np
 cimport numpy as np
 
+
 cdef class BrainbowUnit:
     '''
     BrainbowUnit
@@ -17,7 +18,6 @@ cdef class BrainbowUnit:
 
     #Attributes
     cdef object gt_dataset
-
     cdef object fluo_volumes  # Used to stack results from multiple calls to label_cells
     cdef object parameters # Used to stack parameters from multiple calls to label_cells
     cdef object labeled_cells  # Used to keep track of labeled cells and region for call to get_ground_truth

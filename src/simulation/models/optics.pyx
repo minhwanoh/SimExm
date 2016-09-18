@@ -14,7 +14,6 @@ from src.database.models.dataset import Fluorset
 import src.simulation.psf as psf
 from src.simulation._psf import gaussian_sigma
 
-##################### OPTICS #####################
 
 cdef class ConfocalUnit:
     '''
@@ -48,7 +47,6 @@ cdef class ConfocalUnit:
         objective_factor (float) : magnification factor of objective lens (20x, 40x, ...)
         pixel_size (int) : the size of a pixel in nm
         '''
-
         assert (num_channels > 0), "Resolve at least one channel"
 
         assert (num_channels <= len(laser_wavelengths)),\
@@ -96,7 +94,6 @@ cdef class ConfocalUnit:
         bounds_wanted (tuple (z, x, y) int) : the desired width, height, and depth for the sim output
         
         '''
-
         self.scale_factor_xy  = <float> (voxel_dims[1] * self.objective_factor)  / <float> self.pixel_size
         self.z_offset_step = np.ceil(<float>self.focal_plane_depth / <float>voxel_dims[0])
         w_0 = [<float>self.laser_wavelengths[i] / (<float> pi * self.numerical_aperture) for i in range(self.num_channels)]
@@ -120,7 +117,6 @@ cdef class ConfocalUnit:
         volume_dims ([int] 1 x 3) : size of the volume in each of its 3 dimensions, in number of voxels
         fluors ([string]) : list of fluorophore corresponding to each channel in the volume. Can be obtained the the labeling parameter dictionary
         ''' 
-
         cdef np.ndarray[np.uint8_t, ndim=3] fluo_volume
         cdef np.ndarray[np.uint8_t, ndim=4] images
 
@@ -145,7 +141,6 @@ cdef class ConfocalUnit:
         all_fluor_types : the fluorophores used in labeling (order should correspond to the order of fluors in volume[0])
         channel (int) : the channel to resolve 
         '''
-
         cdef int x, y, z, offset, i, start_index, end_index
         cdef np.ndarray[np.uint32_t, ndim = 1] mean_photons_per_fluor, photons
         cdef np.ndarray[np.float64_t, ndim = 3] non_normalized_volume
@@ -191,7 +186,6 @@ cdef class ConfocalUnit:
         volume (tuple(values, Z, X, Y)) : tranposed matrix of the ground truth volume, with expanded coordinates
         volume_dims (int tuple) : size of the volume in voxels per dimension. Since the volume is tranposed above, helps figure out how to place the data in the volume
         '''
-
         cdef int z_low, z_high, x, y, z, i, start_index, end_index
         (values, Z, X, Y) = volume_gt
 
@@ -228,7 +222,6 @@ cdef class ConfocalUnit:
         offset (int) : the z -offset where to project the fluorohore's emitted photons
         channel (int) : the channel to resolve
         '''
-
         cdef int z_low, z_high, x , y
         cdef np.ndarray[np.float64_t, ndim = 2] non_normalized
 
@@ -246,7 +239,6 @@ cdef class ConfocalUnit:
         fluors ([string]) : list of fluorophore names
         channel (int) :  the channel to compute the photon count on
         '''
-
         cdef int i, emitted_photons, detected_photons
         cdef int num_channels = len(fluors)
         cdef np.ndarray[np.uint32_t, ndim=1] mean_detected_photons = np.zeros(num_channels, np.uint32)
@@ -265,7 +257,6 @@ cdef class ConfocalUnit:
         fluor (string) : the fluorophore to query 
         channel (int) : calculate the number photons given this channel
         '''
-
         fluorset = Fluorset()
         f = fluorset.get_fluor(fluor)
         cdef float quantum_yield = f.get_quantum_yield()
@@ -285,7 +276,6 @@ cdef class ConfocalUnit:
         emitted_photons (int) : the number of emitted photons
         channel (int) : calculate the number photons given this channel
         '''
-
         fluorset = Fluorset()
         f = fluorset.get_fluor(fluor)
 
@@ -303,7 +293,6 @@ cdef class ConfocalUnit:
         num_fluors_per_channel (numpy fluors x voxels) : number of fluors of a certin type per location
         mean_detected photons (numpy uint32 array) : number of photons detected for each fluorophore
         '''
-
         #Initialize with baseline
         cdef int num_voxels = num_fluors_per_channel.shape[1]
         cdef int num_fluors = num_fluors_per_channel.shape[0]
@@ -326,7 +315,6 @@ cdef class ConfocalUnit:
         volume_dim (tuple) : dimensions of the volume in pixels
         channel (int) : the channel on which to base to baseline value
         '''
-
         cdef int x, y, z
         (z, x, y) = volume_dim
 
@@ -364,7 +352,6 @@ cdef class ConfocalUnit:
 
         channel (int) : the channel to build the kernel based on
         '''        
-
         cdef float x_0, y_0, z_0, w_0, z_r, size_z, size_r
         cdef int x, y, z, k
         cdef np.ndarray[np.float64_t, ndim=4] indices
@@ -404,7 +391,6 @@ cdef class ConfocalUnit:
         channel (int) : the channel to work on
         dim (tuple int) : dimension of the image
         '''
-
         cdef long i, index, length, x, y, z, index_x, index_y
         cdef np.ndarray[np.float64_t, ndim=3] kernel = self.get_convolutional_kernel(channel)
         cdef double[:,:] photon_slice = np.zeros(dims, np.float64)
@@ -432,15 +418,12 @@ cdef class ConfocalUnit:
 
         non_normalized (numpy Z x X x Y float) : the non_normalized volume of photons
         '''
-
         cdef float the_max = <float> np.amax(non_normalized)
         cdef np.ndarray[np.float64_t, ndim=3] normalized = non_normalized * (255.0 / the_max)
         return np.array(np.floor(normalized), np.uint8)
 
-
     cpdef object get_parameters(self):
-        ''' Returns a dicitonary containing the parameters used by the optical simulation '''
-
+        '''Returns a dicitonary containing the parameters used by the optical simulation'''
         params = {}
         params['unit_type'] = self.get_type()
         params['num_channels'] = self.num_channels # number of channles in the optical unit
@@ -461,6 +444,5 @@ cdef class ConfocalUnit:
         return params
 
     cpdef object get_type(self):
-        ''' Returns the type of the optical unit '''
-
+        '''Returns the type of the optical unit'''
         return "Confocal"

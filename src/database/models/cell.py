@@ -3,12 +3,14 @@ cell.py
 
 The Cell and CellRegion classes.
 
+These are used to interface with the hdf5 storage format.
 '''
+
 
 import numpy as np
 
-class Cell:
 
+class Cell:
     '''
     Cell object representing a cell by a set of voxels in 3 dimension. 
 
@@ -18,7 +20,7 @@ class Cell:
     The only added annotation is the membrane, which is computed 
     by taking edge pixels in each ground truth image.
     '''
-   
+
     def __init__(self, cell_id, cell_type = "Neuron"):
       '''
       Initialize a cell object
@@ -26,7 +28,6 @@ class Cell:
       cell_id (int) : the id of the Cell object (taken from the ground truth to allow future reference)
       cell_type (string) : the type of the cell, by default "Neuron". Could be "glia" or more specific.
       '''
-
       self.cell_id = cell_id
       self.cell_type = cell_type
       self.cell_regions = {}
@@ -37,7 +38,6 @@ class Cell:
 
       cell_type (string) : the type of the cell, by default "Neuron". Could be "glia" or more specific.
       '''
-
       self.cell_type = cell_type
 
     def set_full_cell(self, voxels, membrane):
@@ -51,13 +51,12 @@ class Cell:
       self.add_region(full_region)
 
     def get_cell_type(self):
-      ''' Returns the cell type  of the cell '''
-
+      '''Returns the cell type  of the cell'''
+      
       return self.cell_type
 
     def get_cell_id(self):
-      ''' Returns the cell_id of the cell '''
-
+      '''Returns the cell_id of the cell'''
       return self.cell_id
 
     def get_full_cell(self, membrane_only = False):
@@ -66,7 +65,6 @@ class Cell:
       
       membrane_only (boolean) : if True, selects only membrane voxels.
       '''
-
       return self.get_region('full', 1, membrane_only)
 
     def add_region(self, region):
@@ -75,14 +73,12 @@ class Cell:
 
       region (CellRegion) : CellRegion obect to add to the cell
       '''
-
       if not self.cell_regions.has_key(region.get_region_type()):
         self.cell_regions[region.get_region_type()] = {}
       self.cell_regions[region.get_region_type()][str(region.get_region_id())] = region
 
     def get_region_types(self):
-      ''' Returns all the types of region annotation present in the dataset as a list of strings. '''
-
+      '''Returns all the types of region annotation present in the dataset as a list of strings.'''
       return self.cell_regions.keys()
 
     def get_all_region_ids(self, region_type):
@@ -91,7 +87,6 @@ class Cell:
 
       region_type (string) : the type of the regions to query
       '''
-
       assert self.cell_regions.has_key(region_type), "Cell has no such region : " + region_type
       return self.cell_regions[region_type].keys()
 
@@ -137,9 +132,7 @@ class Cell:
       return out
 
 
-
 class CellRegion:
-
     '''
     Class representing a region of a cell. As such, this simple class has four attributes.
     The class is a wrapper for a list of voxels decsribing the region in 3 dimensional space.
@@ -148,7 +141,6 @@ class CellRegion:
     The class is used as a way to add new cell region annotations to a dataset
     '''
 
-    
     def __init__(self, region_type, region_id, voxels, membrane):
       '''
       Initalize CellRegion object, set attributes.
@@ -164,13 +156,11 @@ class CellRegion:
       self.region_type = region_type
 
     def get_region_id(self):
-      ''' Returns the id of the region '''
-
+      '''Returns the id of the region'''
       return self.region_id
 
     def get_region_type(self):
-      ''' Returns the type of the region '''
-
+      '''Returns the type of the region'''
       return self.region_type
 
     def get_voxels(self, membrane_only = False):

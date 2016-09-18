@@ -7,6 +7,7 @@ The BrainbowUnit class
 import numpy as np
 cimport numpy as np
 
+
 cdef class BrainbowUnit:
     '''
     BrainbowUnit
@@ -21,7 +22,6 @@ cdef class BrainbowUnit:
 
         gt_dataset (Dataset) : Dataset object for the labeling unit to query. See data.models.dataset
         '''
-        
         self.gt_dataset = gt_dataset 
 
         self.fluo_volumes = [] # Used to stack results from multiple calls to label_cells
@@ -43,7 +43,6 @@ cdef class BrainbowUnit:
         membrane_only (boolean) : if True, labels only the membrane of the indicated region
         single_neuron (boolean) : if True, labels a single random neuron in the dataset
         '''
-
         assert (len(fluors) > 0) , "Indicate at least one fluor"
         assert (protein_density >= 0 and labeling_density >= 0 and antibody_amplification_factor >= 0),\
          "Protein density, labeling density and anitbody aamplication factor should be non negative"
@@ -69,7 +68,6 @@ cdef class BrainbowUnit:
         self.perform_labeling(labeling_dict, fluors, protein_density, antibody_amplification_factor)
         self.add_param(fluors, protein_density, labeling_density, antibody_amplification_factor, fluor_noise, region_type, membrane_only, single_neuron)
 
-    
     cpdef perform_labeling(self, object labeling_dict, object fluors, float protein_density, int antibody_amplification_factor):
         '''
         Performs the labeling, using a dictionary mapping cell_ids to their voxel list. Adds a new fluorophore volume to self.fluo_volumes.
@@ -80,7 +78,6 @@ cdef class BrainbowUnit:
         protein_density (float) : density of the protein stain, in number of fluorophore per nm^3. 
         antibody_amplification_factor (int) : how much to amplify the protein stain
         '''
-
         cdef int x, y, z, n, k, num_neurons, num_proteins, num_fluorophores
         cdef np.ndarray[np.uint32_t, ndim=1] neuron_list, X, Y, Z
         cdef np.ndarray[np.uint32_t, ndim=2] locations, infections
@@ -115,7 +112,6 @@ cdef class BrainbowUnit:
     
     cpdef np.ndarray[np.uint32_t,ndim=4] add_fluorophore_noise(self, np.ndarray[np.uint32_t,ndim=4] fluo_volume, int poisson_mean):
         '''Adds random number of fluorophores in the volume. In reconstruciton..'''
-
         cdef int x, y, z, channels
         channels, z, x, y = fluo_volume.shape[0], fluo_volume.shape[1], fluo_volume.shape[2], fluo_volume.shape[3]
         cdef np.ndarray[np.uint32_t, ndim=4] poisson_number = np.random.poisson(poisson_mean, size=(channels, z, x, y)).astype(np.uint32)
@@ -129,7 +125,6 @@ cdef class BrainbowUnit:
         neuron_numeber (int) : the number of neurons in the set
         num_fluorophores (int) : the number of different fluorophores that may result from a virus infection
         '''
-
         cdef int i, j
         cdef np.ndarray[np.uint32_t,ndim=2] infect = np.zeros((neuron_number, num_fluorophores), np.uint32)
         for i in range(neuron_number):
@@ -139,8 +134,7 @@ cdef class BrainbowUnit:
         return infect
 
     cpdef np.ndarray[np.uint32_t, ndim=4] get_labeled_volume(self):
-        ''' Returns the labeled volume as a (fluorophore x Z x X x Y) numpy array, uint32 '''
-
+        '''Returns the labeled volume as a (fluorophore x Z x X x Y) numpy array, uint32'''
         volumes = np.concatenate(self.fluo_volumes, 0)
         (num_volumes, z, x, y) = volumes.shape
         fluors = self.get_fluors_used()
@@ -161,7 +155,6 @@ cdef class BrainbowUnit:
 
         membrane_only (boolean) : if True, ground truth has only membranes. Tip: use False and use imageJ edge detection if you need the membranes too.
         '''
-
         cdef int x, y, z
         (z, x, y) = self.gt_dataset.get_volume_dim()
         cdef np.ndarray[np.uint32_t, ndim=3] ground_truth = np.zeros((z, x, y), np.uint32)
@@ -186,7 +179,6 @@ cdef class BrainbowUnit:
 
         Arguments are the same as label_cells
         ''' 
-
         for fluor in fluors:
             #Create param dict
             params  = {}
@@ -201,8 +193,7 @@ cdef class BrainbowUnit:
             self.parameters.append({'fluor' : fluor, 'params' : params})
 
     cpdef object get_parameters(self):
-        ''' Returns a dictionary with the different parameters used throughout the labeling simulation '''
-
+        '''Returns a dictionary with the different parameters used throughout the labeling simulation.'''
         out = {}
         for param_dict in self.parameters:
             fluor = param_dict['fluor']
@@ -217,13 +208,11 @@ cdef class BrainbowUnit:
         return out
 
     cpdef object get_fluors_used(self):
-        '''Returns the total list of fluorophores used in the volume'''
-
+        '''Returns the total list of fluorophores used in the volume.'''
         return list(set([param['fluor'] for param in self.parameters]))
 
     cpdef object get_type(self):
-        ''' Returns the type of the labeling unit, here Brainbow. '''
-
+        '''Returns the type of the labeling unit, here Brainbow.'''
         return "Brainbow"
     
 
