@@ -175,6 +175,7 @@ cdef class ConfocalUnit:
         #Compiler getting angry if i don't don't unpack manually...
         (vz, vx, vy) = normalized_volume.shape[0], normalized_volume.shape[1], normalized_volume.shape[2]
         normalized_volume = np.add(normalized_volume, self.get_baseline_volume((vz, vx, vy), channel))
+        normalized_volume = self.normalize(normalized_volume.astype(np.float64))
 
         return normalized_volume
  
@@ -370,7 +371,7 @@ cdef class ConfocalUnit:
         w_0 =  <float>self.laser_wavelengths[channel] / (<float> pi * self.numerical_aperture)
         z_r = pi * ((w_0)**2) / <float>self.laser_wavelengths[channel]
         w_z = (w_0) * np.sqrt(1 + (size_z * (indices[0] - z_0) / z_r)**2)
-        kernel = (((w_0) / (w_z)) ** 2) * np.exp(- 2 * ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
+        kernel = (((w_0) / (w_z))) * np.exp(- ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
 
         #Normalize
         kernel = kernel / np.sum(kernel) 
