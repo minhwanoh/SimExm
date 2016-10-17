@@ -38,14 +38,6 @@ do
     wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i -0 destination_path/ground_truth/bodies-xy-$i.png  
 done
 ```
-Or if you are using Mac OS:
-
-```
-for i  in {2000..4000}  
-do  
-    curl "http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i" -0 "destination_path/ground_truth/bodies-xy-$i.png"  
-done
-```
 
 Make sure to indicate a writable destination path for the images.
 
