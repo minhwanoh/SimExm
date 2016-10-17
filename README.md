@@ -35,7 +35,7 @@ The data can be downloaded from : emdata.janelia.org. The following command, dow
 ```
 for i  in {2000..4000}  
 do  
-    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i -o destination_path/ground_truth/bodies-xy-$i.png  
+    wget http://emdata.janelia.org/api/node/bf1/bodies/raw/xy/2000_2000/1800_2300_$i -O destination_path/ground_truth/bodies-xy-$i.png  
 done
 ```
 
