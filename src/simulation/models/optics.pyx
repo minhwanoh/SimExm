@@ -420,6 +420,8 @@ cdef class ConfocalUnit:
         non_normalized (numpy Z x X x Y float) : the non_normalized volume of photons
         '''
         cdef float the_max = <float> np.amax(non_normalized)
+        if the_max == 0:#Fixes dividing by 0 error if nothing in the volume
+            return np.array(non_normalized, np.uint8)
         cdef np.ndarray[np.float64_t, ndim=3] normalized = non_normalized * (255.0 / the_max)
         return np.array(np.floor(normalized), np.uint8)
 
