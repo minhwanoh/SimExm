@@ -73,7 +73,7 @@ laser_wavelengths = [488, 565, 660]
 laser_power  = [50, 50, 50]
 laser_percentage   = [0.25, 0.25, 0.25]
 objective_back_aperture  = 1.0
-baseline = [50, 50, 50]
+baseline = [0.2, 0.2, 0.2]
 filters = [[450, 550], [550, 625], [625, 950]]
 exposure_time  = 0.1 seconds
 numerical_aperture  = 1.15
@@ -86,7 +86,7 @@ refractory_index = 1.33
 pinhole_radius = 0.55 um
 """
 
-optical_unit = ConfocalUnit(num_channels = 3, baseline = [0,0,0])
+optical_unit = ConfocalUnit(num_channels = 2, baseline = [0.4, 0.4, 0.2])
 
 #Compute additional parameters, using the voxel_dim, the expansion factor and the wanted output bounds
 bounds_required = optical_unit.compute_parameters(voxel_dim, expansion_unit.get_expansion_factor(), bounds_wanted)
@@ -128,8 +128,7 @@ single_neuron = False
 print "Performing labeling simulation..."
 
 #Repeat this as many time as you'd like
-labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488', 'ATTO550', 'ATTO647N'], labeling_density = 0.5, protein_density = 0.0001, membrane_only = False)
-
+labeling_unit.label_cells(region_type = 'full', fluors = ['ATTO488', 'ATTO550'], labeling_density = 0.5, protein_density = 1e-3, membrane_only = True)
 
 fluo_volume = labeling_unit.get_labeled_volume()
 fluo_gt = labeling_unit.get_ground_truth(membrane_only = gt_membrane_only)
@@ -158,7 +157,7 @@ sim_stack = SimStack(sim_volume, sim_gt, sim_params)
 
 print "Saving results..."
 
-sim_name = "simulation2"
+sim_name = "simulation3"
 dest = "/home/jeremy/"
 
 #Save or view the sim_stack, can save as tiff, gif, image_sequence (see src.database.models.sim.SimStack)

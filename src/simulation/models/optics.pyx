@@ -25,7 +25,7 @@ cdef class ConfocalUnit:
     '''
 
     def __cinit__(self, num_channels = 3,  laser_wavelengths = [488, 565, 660], laser_power  = [50, 50, 50], \
-                    laser_percentage   = [0.25, 0.25, 0.25], objective_back_aperture  = 1.0, baseline = [30,30,30],\
+                    laser_percentage   = [0.25, 0.25, 0.25], objective_back_aperture  = 1.0, baseline = [0.2, 0.2, 0.2],\
                     filters = [[450, 550], [550, 625], [625, 950]], exposure_time  = 0.1 ,\
                     numerical_aperture  = 1.15, objective_efficiency  = 0.8, detector_efficiency  = 0.6,\
                     focal_plane_depth  = 500, objective_factor  = 40.0, pixel_size = 6500, refractory_index = 1.33, pinhole_radius = 0.55):
@@ -141,9 +141,9 @@ cdef class ConfocalUnit:
         all_fluor_types : the fluorophores used in labeling (order should correspond to the order of fluors in volume[0])
         channel (int) : the channel to resolve 
         '''
-        cdef int x, y, z, offset, i, start_index, end_index
+        cdef int x, y, z, offset, i, start_index, end_index, the_max
         cdef np.ndarray[np.uint32_t, ndim = 1] mean_photons_per_fluor, photons
-        cdef np.ndarray[np.float64_t, ndim = 3] non_normalized_volume
+        cdef np.ndarray[np.uint32_t, ndim = 3] non_normalized_volume
         cdef np.ndarray[np.uint8_t, ndim=3] normalized_volume
         
         # Load transposed volume
@@ -163,19 +163,20 @@ cdef class ConfocalUnit:
         i = 0
         start_index = np.ceil(max(self.z_max)) # We start with an offset of 4 times the maximum z-std
         end_index = np.floor(volume_dims[0] - max(self.z_max)) # End with the same offset
-        non_normalized_volume = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.float64) #Create empty volume
+        non_normalized_volume = np.zeros(((end_index - start_index) / self.z_offset_step + 1, x, y), np.uint32) #Create empty volume
 
         #Populate volume
         for offset in range(start_index, end_index, self.z_offset_step):
             non_normalized_volume[i,:,:] = self.resolve_slice(Z, X, Y, photons, (x,y), offset, channel)
             i = i + 1
 
-        #Normalize
-        normalized_volume = self.normalize(non_normalized_volume)
         #Compiler getting angry if i don't don't unpack manually...
-        (vz, vx, vy) = normalized_volume.shape[0], normalized_volume.shape[1], normalized_volume.shape[2]
-        normalized_volume = np.add(normalized_volume, self.get_baseline_volume((vz, vx, vy), channel))
-        normalized_volume = self.normalize(normalized_volume.astype(np.float64))
+        (vz, vx, vy) = non_normalized_volume.shape[0], non_normalized_volume.shape[1], non_normalized_volume.shape[2]
+        the_max = np.floor(np.amax(non_normalized_volume))
+        print the_max
+        non_normalized_volume = np.add(non_normalized_volume, self.get_baseline_volume((vz, vx, vy), channel, the_max))
+        #normalize
+        normalized_volume = self.normalize(non_normalized_volume)
 
         return normalized_volume
  
@@ -307,7 +308,7 @@ cdef class ConfocalUnit:
 
         return photons
 
-    cdef np.ndarray[np.uint8_t, ndim=3] get_baseline_volume(self, object volume_dim, int channel):
+    cdef np.ndarray[np.uint32_t, ndim=3] get_baseline_volume(self, object volume_dim, int channel, int max_value):
         ''' 
         Creates a baseline volume for initial photon count. 
         Multiplies a random poisson distirbution with mean self.baseline[channel]
@@ -317,13 +318,15 @@ cdef class ConfocalUnit:
         channel (int) : the channel on which to base to baseline value
         '''
         cdef int x, y, z
+        cdef int poisson_mean
         (z, x, y) = volume_dim
 
         cdef np.ndarray[np.float64_t, ndim=2] psf = self.get_2dgaussian_kernel(x, y, <float> x / 2.0, <float> y / 2.0) 
-        cdef np.ndarray[np.uint8_t, ndim=3] baseline_volume = np.zeros(volume_dim, np.uint8)
+        cdef np.ndarray[np.uint32_t, ndim=3] baseline_volume = np.zeros(volume_dim, np.uint32)
 
+        poisson_mean = np.ceil(self.baseline[channel] * max_value)
         for i in range(z):
-            baseline_volume[i,:,:] = np.floor(np.multiply(np.random.poisson(self.baseline[channel], size=(x, y)), psf)).astype(np.uint8)
+            baseline_volume[i,:,:] = np.floor(np.multiply(np.random.poisson(poisson_mean, size=(x, y)), psf))
         
         return baseline_volume
 
@@ -372,9 +375,6 @@ cdef class ConfocalUnit:
         z_r = pi * ((w_0)**2) / <float>self.laser_wavelengths[channel]
         w_z = (w_0) * np.sqrt(1 + (size_z * (indices[0] - z_0) / z_r)**2)
         kernel = (((w_0) / (w_z))) * np.exp(- ((size_r * (indices[1] - x_0))**2 + (size_r * (indices[2] - y_0))**2) / (w_z ** 2))
-
-        #Normalize
-        kernel = kernel / np.sum(kernel) 
         
         return kernel
 
@@ -413,7 +413,7 @@ cdef class ConfocalUnit:
         return np.array(photon_slice, np.float64)
 
     
-    cdef np.ndarray[np.uint8_t, ndim=3] normalize(self, np.ndarray[np.float64_t, ndim=3] non_normalized):
+    cdef np.ndarray[np.uint8_t, ndim=3] normalize(self, np.ndarray[np.uint32_t, ndim=3] non_normalized):
         '''
         Normalize array by dividing by maximum and convert to uint8
 
