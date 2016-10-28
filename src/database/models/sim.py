@@ -27,7 +27,7 @@ class SimStack:
         ground_truth (numpy Z x X x Y, uint32 ) : the simulation ground truth output
         sim_params (SimParams) : an instance of the SimParams class, which helps deal with parameter file
         '''
-        self.image_sequence = [np.squeeze(image_volume[i, :, :, :]) for i in range(image_volume.shape[0])]
+        self.image_sequence = [image_volume[i, :, :, :] for i in range(image_volume.shape[0])]
         self.ground_truth = [np.squeeze(ground_truth[i, :, :]) for i in range(ground_truth.shape[0])]
         self.num_channels = image_volume.shape[3]
         self.sim_params = sim_params
