@@ -32,8 +32,22 @@ class SimStack:
         self.num_channels = image_volume.shape[3]
         self.sim_params = sim_params
 
-        if self.num_channels < 3:
-            self.add_empty_channel(num = 3 - self.num_channels)
+        if self.num_channels % 3 > 0:
+            #Adds empty channels such that the total is mod 3
+            new_channels = 3 - self.num_channels % 3
+            self.num_channels += new_channels
+            self.add_empty_channels(num = new_channels)
+
+    def fix_path(self, path):
+        '''
+        Adds '/' to path if not last character
+
+        path (string) : the path to read and fix
+        '''
+        if path[-1] != "/":
+            path += "/"
+        return path
+
 
     def add_empty_channels(self, num = 1):
         '''
@@ -55,9 +69,12 @@ class SimStack:
         path (string) : the destination folder
         name (string) : the name of the file
         '''
-        if path[-1] != "/":
-            path += "/"
-        writeGif(path + name + ".gif", self.image_sequence, duration=0.5)
+        path = self.fix_path(path)
+        for channel_count in range(0, self.num_channels, 3):
+            sequence = [np.squeeze(img[:,:,channel_count:channel_count + 3]) for img in self.image_sequence]
+            dest = path + name + "_channels_" + str(channel_count) +\
+                str(channel_count + 1) + str(channel_count + 2) +" .gif"
+            writeGif(path + name + ".gif", sequence, duration=0.5)
         writeGif(path + name + "_gt.gif", self.ground_truth, duration=0.5)
         self.sim_params.save(path, name + "_params")
 
@@ -68,13 +85,16 @@ class SimStack:
         path (string) : the destination folder
         name (string) : the name of the file
         '''
-        if path[-1] != "/":
-            path += "/"
-        for i in range(len(self.image_sequence)):
-            im = Image.fromarray(self.image_sequence[i], 'RGB')
-            gt = Image.fromarray(self.ground_truth[i], 'L')
-            im.save(path + name + "/" + "image_" + str(i) + ".png")
-            gt.save(path + name + "_gt/" + "image_" + str(i) + ".png")
+        path = self.fix_path(path)
+        for channel_count in range(0, self.num_channels, 3):
+            sequence = [np.squeeze(img[:,:,channel_count:channel_count + 3]) for img in self.image_sequence]
+            for i in range(len(sequence)):
+                im = Image.fromarray(sequence[i], 'RGB')
+                im.save(path + name + "/" + "image_" + str(i) + "_channels_" \
+                    + str(channel_count) + str(channel_count + 1) + str(channel_count + 2) + ".png")
+                if channel_count < 3:
+                    gt = Image.fromarray(self.ground_truth[i], 'L')
+                    gt.save(path + name + "_gt/" + "image_" + str(i) + ".png")
         self.sim_params.save(path, name + "_params")
 
     def save_as_tiff(self, path, name, sixteen_bit_mode = False):
@@ -85,11 +105,15 @@ class SimStack:
         name (string) : the name of the file
         sixteen_bit_mode (boolean) : if True, the Tiff stack has 16 bits per channel, default is 8 bits
         '''
-        if path[-1] != "/": path += "/"
-        if sixteen_bit_mode:
-            imsave(path + name + ".tif", np.array(self.image_sequence, np.uint16), photometric='rgb')
-        else:
-            imsave(path + name + ".tif", np.array(self.image_sequence, np.uint8), photometric='rgb')
+        path = self.fix_path(path)
+        for channel_count in range(0, self.num_channels, 3):
+            sequence = [np.squeeze(img[:,:,channel_count:channel_count + 3]) for img in self.image_sequence]
+            dest = path + name + "_channels_" + str(channel_count) +\
+                str(channel_count + 1) + str(channel_count + 2) +" .tif"
+            if sixteen_bit_mode:
+                imsave(dest, np.array(sequence, np.uint16), photometric='rgb')
+            else:
+                imsave(dest, np.array(sequence, np.uint8), photometric='rgb')
         imsave(path + name + "_gt.tif", np.array(self.ground_truth, np.float32), photometric='minisblack')
         self.sim_params.save(path, name + "_params")
 
