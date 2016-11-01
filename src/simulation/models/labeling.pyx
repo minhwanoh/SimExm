@@ -175,7 +175,7 @@ cdef class BrainbowUnit:
         ''' 
         Adds a new set of parameters to the main parameter dictionary. 
         Each fluorophore is marked with a set of parameters.
-         If label_cells is called multiple time with the same fluorophore, the parameters are appended.
+        If label_cells is called multiple time with the same fluorophore, the parameters are appended.
 
         Arguments are the same as label_cells
         ''' 

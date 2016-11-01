@@ -114,7 +114,7 @@ class Dataset:
             region_object = CellRegion(region_type, region_id, voxels, membrane)
             cell_object.add_region(region_object)
 
-    def load_from_image_stack(self, voxel_dim, cell_stack, region_annotations = [], region_types = [], cell_type_dict = None):
+    def load_from_image_stack(self, voxel_dim, cell_stack, region_annotations = [], region_types = [], cell_type_dict = None, isotropic = True):
         '''
         Loads a ground truth stack into the dataset object
 
@@ -138,7 +138,7 @@ class Dataset:
             if cell_type_dict and cell_type_dict.has_key(cell_id): 
                 cell.set_cell_type(cell_type_dict[cell_id])
             #Load main voxels and compute membrane
-            self.load_cell_from_stack(cell, cell_stack, non_zero)
+            self.load_cell_from_stack(cell, cell_stack, non_zero, isotropic)
 
             #Load other annotations
             for i in range(len(region_annotations)):
@@ -147,7 +147,7 @@ class Dataset:
 
             self.add_cell(cell)
 
-    def load_cell_from_stack(self, cell, cell_stack, non_zero):
+    def load_cell_from_stack(self, cell, cell_stack, non_zero, isotropic = True):
         '''
         Helper function to load_image_stack, loads a cell by computing its voxels in three dimension as well as its edges (i.e membrane)
 
@@ -165,7 +165,10 @@ class Dataset:
         membrane_indices = np.zeros(voxel_list.shape[0], np.bool)
         for i in range(voxel_list.shape[0]):
             (z, x, y) = voxel_list[i, :]
-            membrane_indices[i] = np.unique(cell_stack[z - 1 : z + 2, x - 1 : x + 2, y - 1 : y + 2]).size > 1
+            if isotropic:
+                membrane_indices[i] = np.unique(cell_stack[z - 1 : z + 2, x - 1 : x + 2, y - 1 : y + 2]).size > 1
+            else:
+                membrane_indices[i] = np.unique(cell_stack[z, x - 1 : x + 2, y - 1 : y + 2]).size > 1
 
         membrane_list = voxel_list[membrane_indices, :]
 
