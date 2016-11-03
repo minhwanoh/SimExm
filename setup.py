@@ -17,4 +17,4 @@ setup(ext_modules = cythonize(extensions, compiler_directives={'extra_compile_ar
 setup(name = "_psf", ext_modules = [Extension("src/simulation/_psf",["src/simulation/psf.c"], include_dirs = [numpy.get_include()])])
 
 #Compile tiffile extension
-setup(name = "_tifffile", ext_modules = [Extension("src/database/_tifffile",["src/database/tifffile.c"], include_dirs = [numpy.get_include()])])
+setup(name = "_tifffile", ext_modules = [Extension("src/database/models/_tifffile",["src/database/models/tifffile.c"], include_dirs = [numpy.get_include()])])
