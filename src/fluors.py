@@ -1,32 +1,86 @@
-'''
+# Provided under the MIT License (MIT)
+# Copyright (c) 2016 Jeremy Wohlwend
+
+# Permission is hereby granted, free of charge, to any person obtaining 
+# a copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the Software
+# is furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+# OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+"""
 fluors.py
 
 The Fluorophore class and a subclass for each type (for easy data access and storage)
-
-'''
-
+"""
 
 import os
 import numpy as np
 
+class Fluorset: 
+
+    '''
+    Interface to access fluorophore data. The data is located in the fluordata folder.
+    This is a pre-initialized dataset which is used to query flurophore parameters in the labeling simualtion.
+    '''
+    def __init__(self):
+        '''
+        Init method, hard-coded.
+        all_fluors (list of FLuorophore objects) : list of all fluorophore instances in fluors.py
+        '''
+        self.all_fluors = [Alexa350(), Alexa790(), ATTO390(), ATTO425(), ATTO430LS(), ATTO465(), ATTO488(), ATTO490LS(), ATTO550(), ATTO647N(), ATTO700()]
+
+
+    def get_all_fluorophores_types(self):
+        '''Returns a list of flurophore types as a list of strings'''
+        return [fluor.get_name() for fluor in self.all_fluors]
+
+
+    def get_fluor(self, name):
+        '''
+        Returns the desired Fluorophore object. See fluors.py
+
+        name (string) : the name of the fluorophore to query
+        '''
+        fluors = self.get_all_fluorophores_types()
+        index = fluors.index(name)
+        return self.all_fluors[index]
+
 
 class Fluorophore:
-    '''
+    """
     Interface to interace with a fluorophore's data.
     Instances of the FLuorohore class are used to enumerate fluorophore parameters,
     some of which are hard-coded in this file.
 
-    Init method, sets attributes
-
-    name (string) : Name given to the fluorophore
-    xls (string) : Path to xls file containing fluorophore data
-    excitation (string) : string, Path to file containing excitation data
-    emission (string) : Path to file containing excitation data
-    extinction_coefficient (int) : Coefficient of exctinction
-    quantum_yield (float) : Value of the quantum yeild
-    source (string) : Source where the data can be obtained / verified
-    comments (string) : Additonal comments for the user 
-    '''
+    name: string 
+        Name given to the fluorophore
+    xls: string
+        Path to xls file containing fluorophore data
+    excitation: string
+        Path to file containing excitation data
+    emission: string
+        Path to file containing excitation data
+    extinction_coefficient: int
+        Coefficient of exctinction
+    quantum_yield: float
+        Value of the quantum yeild
+    source: string
+        Source where the data can be obtained / verified
+    comments: string 
+        Additonal comments for the user 
+    """
     name = ""
     xls = ""
     quantum_yield = 0.0
@@ -38,27 +92,27 @@ class Fluorophore:
 
 
     def get_name(self):
-        '''Returns the (string) type of the fluoropore'''
+        """Returns the (string) type of the fluoropore"""
         return self.name
 
     def get_quantum_yield(self):
-        '''Returns the (float) quantum yield of the fluorophore'''
+        """Returns the (float) quantum yield of the fluorophore"""
         return float(self.quantum_yield)
 
     def get_extinction_coefficient(self):
-        '''Returns the (float) extinction coefficient of the fluorophore'''
+        """Returns the (float) extinction coefficient of the fluorophore"""
         return float(self.extinction_coefficient)
 
     def get_source(self):
-        '''Returns the (string) source, where information about the flurophore can be found'''
+        """Returns the (string) source, where information about the flurophore can be found"""
         return self.source
 
     def get_comments(self):
-        '''Returns (string) comments, addional information about the fluorophore'''
+        """Returns (string) comments, addional information about the fluorophore"""
         return self.comments
 
     def get_emission_file(self):
-        '''Returns emission data as a float numpy array'''
+        """Returns emission data as a float numpy array"""
         file_path = self.emission
         f = open(file_path, 'r')
         raw_data = f.read().split("\r")
@@ -66,7 +120,7 @@ class Fluorophore:
         return raw_data
 
     def get_excitation_file(self):
-        '''Returns excitation data as a float numpy array'''
+        """Returns excitation data as a float numpy array"""
         file_path = self.excitation
         f = open(file_path, 'r')
         raw_data = f.read().split("\r")
@@ -74,11 +128,8 @@ class Fluorophore:
         return raw_data
 
     def find_excitation(self, wavelength):
-        ''' 
-        Returns the excitation value of the given fluorophore, at the given wavelenght
-
-        wavelenght (int) : value in nm
-        '''
+        """Returns the excitation value of the given fluorophore, 
+        at the given (int) wavelenght in nm"""
         raw_data = self.get_excitation_file()
         data     = raw_data[:,1] / np.max(raw_data[:,1])
         data_min = np.min(raw_data[:,0])
@@ -95,13 +146,10 @@ class Fluorophore:
 
         return excitation
 
-    def find_emission(self, wavelength_min, wavelength_max):
-        ''' 
-        Returns the emission value of the given fluorophore, at the given wavelenghts
-
-        wavelenght_min (int) : minimum value in nm
-        wavelenght_max (int) : maximum value in nm
-        '''
+    def find_emission(self, laser_filter):
+        """Returns the emission value of the given fluorophore, at the given minimum
+        and maximum (int) wavelenghts in nm"""
+        wavelength_min, wavelength_max = laser_filter
         raw_data = self.get_emission_file()
         data     = raw_data[:,1] / np.sum(raw_data[:,1])
         interval = round(np.mean(np.diff(raw_data[:,0])),2)

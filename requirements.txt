@@ -1,9 +1,9 @@
 numpy
-Cython   
-jupyter  
-ipywidgets
 matplotlib
+itertools
 Pillow 
 scipy
 images2gif
+tifffile
 h5py
+configobj
