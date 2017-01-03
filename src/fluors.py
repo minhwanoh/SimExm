@@ -29,33 +29,38 @@ import os
 import numpy as np
 
 class Fluorset: 
-
-    '''
+    """
     Interface to access fluorophore data. The data is located in the fluordata folder.
     This is a pre-initialized dataset which is used to query flurophore parameters in the labeling simualtion.
-    '''
+    """
     def __init__(self):
-        '''
+        """
         Init method, hard-coded.
         all_fluors (list of FLuorophore objects) : list of all fluorophore instances in fluors.py
-        '''
-        self.all_fluors = [Alexa350(), Alexa790(), ATTO390(), ATTO425(), ATTO430LS(), ATTO465(), ATTO488(), ATTO490LS(), ATTO550(), ATTO647N(), ATTO700()]
-
+        """
+        self.all_fluors = [Alexa350(), Alexa790(), ATTO390(), ATTO425(), ATTO430LS(),\
+                    ATTO465(), ATTO488(), ATTO490LS(), ATTO550(), ATTO647N(), ATTO700()]
 
     def get_all_fluorophores_types(self):
-        '''Returns a list of flurophore types as a list of strings'''
+        """Returns a list of flurophore types as a list of strings"""
         return [fluor.get_name() for fluor in self.all_fluors]
 
 
     def get_fluor(self, name):
-        '''
+        """
         Returns the desired Fluorophore object. See fluors.py
-
-        name (string) : the name of the fluorophore to query
-        '''
+        
+        Args:
+            name: string
+                the name of the fluorophore to query
+        Returns:
+            fluor: Fluorophore object
+                the desired fluorophore object
+        """
         fluors = self.get_all_fluorophores_types()
         index = fluors.index(name)
-        return self.all_fluors[index]
+        fluor = self.all_fluors[index]
+        return fluor
 
 
 class Fluorophore:

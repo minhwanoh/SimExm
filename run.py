@@ -45,7 +45,7 @@ def run(config):
         None
     """
     gt_params = config['groundtruth']
-    volume_dims = gt_params['bounds']
+    volume_dim = gt_params['bounds']
     voxel_dim = gt_params['voxel_dim']
     #Remove voxel dim so that we can pass gt_params to the load_gt function
     del gt_params['voxel_dim']
@@ -55,12 +55,12 @@ def run(config):
 
     print "Labeling..."
     labeling_params = config['labeling']
-    labeled_volumes, labeled_cells = label(gt_dataset, volume_dims, voxel_dim, labeling_params)
+    labeled_volumes, labeled_cells = label(gt_dataset, volume_dim, voxel_dim, labeling_params)
 
     print "Imaging..."
     expansion_params = config['expansion']
     optics_params = config['optics']
-    volumes = resolve(labeled_volumes, volume_dims, voxel_dim, expansion_params, optics_params)
+    volumes = resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_params)
     print "Saving..."
     #Save to desired output
     output_params = config['output']

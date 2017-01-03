@@ -37,7 +37,8 @@ import numpy as np
 import os
 from matplotlib.pyplot import imshow, show
 
-def load_gt(image_path, offset, bounds, regions=[]):
+
+def load_gt(image_path, offset, bounds, regions={}):
     """
     Init method. Reads data from image_path, using the given offset and bounds and 
     loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
@@ -79,32 +80,6 @@ def load_gt(image_path, offset, bounds, regions=[]):
     gt_dataset = load_cells(main_data, loaded_regions, loaded_region_names)
     return gt_dataset
 
-def load_images(image_path, offset, bounds):
-    """
-    Reads the image sequence located at image path into a 3d array
-    """
-    if image_path[-1] != '/': image_path += '/'
-    gt = np.zeros(bounds, np.uint32)
-    images = parse(image_path)
-    d, w, h = bounds
-    z, x, y = offset
-    for i in xrange(d):
-        im = imread(image_path + images[z + i], mode = 'I')
-        gt[i, :, :] = im[x : x + w, y : y + h]
-    return gt
-
-def load_cells(main_gt_data, regions, region_names):
-    cells = {}
-    d, w, h = main_gt_data.shape
-    for k, i, j in product(xrange(d), xrange(w), xrange(h)):
-        cell_id = main_gt_data[k, i, j]
-        if cell_id != 0:
-            cells.setdefault(cell_id, {name: set() for name in region_names})
-            for region, region_type in zip(regions, region_names): 
-                if region[k, i, j] != 0:
-                    cells[cell_id][region_type].add((k, i, j))
-    return cells
-
 def parse(image_path):
     """
     Parses the given image directory path by
@@ -125,6 +100,62 @@ def parse(image_path):
     if images[0] == '.DS_Store':
         images = images[1:]
     return images
+
+def load_images(image_path, offset, bounds):
+    """
+    Reads the image sequence located at image path into a 3d array
+
+    Args:
+        image_path: string
+            the path where the image sequence is located
+        offset: (z, x y) tuple
+            the offset from which to load the data. For instance an offset of (z, x, y)
+            starts at the zth image and uses the (x, y) pixel as top left
+        bounds: (z, x, y) tuple
+            the size of the data to load. Could be smaller than the full size of data,
+            should not be larger.
+    Returns:
+        gt: numpy uint32 3D array
+    """
+    if image_path[-1] != '/': image_path += '/'
+    gt = np.zeros(bounds, np.uint32)
+    images = parse(image_path)
+    d, w, h = bounds
+    z, x, y = offset
+    for i in xrange(d):
+        im = imread(image_path + images[z + i], mode = 'I')
+        gt[i, :, :] = im[x : x + w, y : y + h]
+    return gt
+
+def load_cells(main_gt_data, regions, region_names):
+    """
+    Given the cell segmentation and region annotations,
+    loads the ground truth into simulation format.
+
+    Args:
+        main_gt_data: numpy 3D uint 32 array
+            the main cell segmentation
+        regions: list of numpy boolean arrays
+            list of volumes indicating a specific cell region.
+            By default, contains "cytosol" and "membrane"
+        region_names: list of strings
+            the corresponding region names, as indexed in regions
+    Returns:
+        cells: dict cell_id (string) -> region (string) -> voxels (list of (z, x, y) tuples)
+            the loaded data, in simulation format, with the cell_ids as keys pointing to 
+            a sub dict which points from cell regions to lists of voxels in the form 
+            of (z, x, y) tuples, where each tuple is a voxel.
+    """
+    cells = {}
+    d, w, h = main_gt_data.shape
+    for k, i, j in product(xrange(d), xrange(w), xrange(h)):
+        cell_id = main_gt_data[k, i, j]
+        if cell_id != 0:
+            cells.setdefault(cell_id, {name: [] for name in region_names})
+            for region, region_type in zip(regions, region_names): 
+                if region[k, i, j] != 0:
+                    cells[cell_id][region_type].append((k, i, j))
+    return cells
 
 def split(gt):
     """

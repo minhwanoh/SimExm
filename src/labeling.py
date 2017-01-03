@@ -21,6 +21,9 @@
 
 """
 labeling.py
+
+Set of methods to handle the labeling of ground truth data.
+Implements the brainbow method.
 """
 import numpy as np
 from numpy.random import random_sample
@@ -41,15 +44,15 @@ def label(gt_dataset, volume_dim, voxel_dim, labeling_params):
         labeling_params: dict
             dictionary containing the labeling parameters for each fluorophore
     Returns:
-        labeled_volumes
-        labeled_cells
-
+        labeled_volumes: dict fluorophore->3d array
+            a dict from fluorophore to corresponfing 3d volume
+        labeled_cells: dict fluorophore -> list of cell_ids
+            list of cells labeled for each fluorophore
     """
     labeled_volumes = dict()
     labeled_cells = dict()
     for layer in labeling_params:
         fluorophore = labeling_params[layer]['fluorophore']
-        del labeling_params[layer]['fluorophore']
         volume, cells  = brainbow(gt_dataset, volume_dim, voxel_dim, **labeling_params[layer])
         if fluorophore in labeled_volumes:
             labeled_volumes[fluorophore] += volume
@@ -61,7 +64,7 @@ def label(gt_dataset, volume_dim, voxel_dim, labeling_params):
 
 
 def brainbow(gt_dataset, volume_dim, voxel_dim, region, labeling_density,\
-             protein_density, antibody_amp, single_neuron):
+             protein_density, protein_noise, antibody_amp, single_neuron, **kwargs):
     """
     Distributes fluorophores and the corresponding antibodies accross the given cells.
     Follows the brainbow labeling strategy: proteins are distributed
@@ -69,12 +72,33 @@ def brainbow(gt_dataset, volume_dim, voxel_dim, region, labeling_density,\
     Then, fluorophore locations are computed by dstirbuting antibodies 
     around the protein locations.
 
-    Args:
+    Args:  
+        gt_dataset: dict cell_id -> region -> voxels
+            ground truth dataset in dict format
+        volume_dim: (z, x, y) tuple
+            dimensions of the ground truth volume
+        voxel_dim: (z, x, y) tuple
+            dimensions of a ground truth voxel
+        region: list of (z, x, y) tuples
+            list of voxels
+        labeling_density: float64
+            the proportion of cells to label
+       protein_density: float
+            the density of protein labeling, in protein per nm^3
+       protein_noise: float
+            the amount of protein noise to include.
+            Determines what proportion of proteins flies away
+            from the labeled region
+       antibody_amp: float
+            the factor by which to amplify the protein density
+       single_neuron: boolean
+            if True, only a single cell is labeled
     
     Returns:
-        labeled_volumes
-        labeled_cells
-
+        labeled_volumes: numpy uint32 3D array
+            the labeled volume
+        labeled_cells: set
+            the set of cell_ids, indicating which cells were labeled
     """
     labeled_cells = {cell_id for cell_id in gt_dataset if random_sample() < labeling_density}
     if single_neuron: 
@@ -83,53 +107,51 @@ def brainbow(gt_dataset, volume_dim, voxel_dim, region, labeling_density,\
     volume = np.zeros(volume_dim, np.uint32)
     for cell_id in labeled_cells:
         #Get cell data
-        reg = list(gt_dataset[cell_id][region])
+        reg = gt_dataset[cell_id][region]
         if len(reg) == 0: continue
         prob = np.ones(len(reg), np.float64) * 1.0 / len(reg)
         #Compute number of proteins to distribute
         mean_proteins = int(protein_density * len(reg) * np.prod(voxel_dim))
         num_proteins = np.random.poisson(mean_proteins)
         distribution = np.random.multinomial(num_proteins, prob, size=1).squeeze()
-        Z, X, Y = np.transpose(reg)
-        volume[Z, X, Y] = distribution
-        #Add antibodies
-        volume = antibodies(volume, voxel_dim, antibody_amp)
+        voxels = noise(reg, volume_dim, voxel_dim, protein_noise)
+        Z, X, Y = voxels.transpose()
+        for i in range(len(Z)):
+            volume[Z[i], X[i], Y[i]] += np.round(distribution[i] * antibody_amp).astype(np.uint32)
 
     return volume, labeled_cells
 
-def antibodies(volume, voxel_dim, antibody_amp):
+def noise(voxels, volume_dim, voxel_dim, protein_noise):
     """
-    Takes a volume containing binding proteins and distributes antibodies
-    accordingly. Adds gaussian noise to mimic the location of random noisy 
-    fluorophores in the volume.
+    Adds gaussian noise to a random subset of the given voxels.
+    Clips values outside of the volume dimensions.
 
     Args:
-        volume
-        voxel_dim
-        antibody_amp
+        voxels: numpy 2D array (n x 3)
+            list of (z, x, y) tuple representing a voxel
+        volume_dim: (z, x, y) tuple
+            dimensions of the ground truth volume
+        voxel_dim: (z, x, y) tuple
+            dimensions of a ground truth voxel
+        protein_noise: float
+            the amount of protein noise to include.
+            Determines what proportion of proteins flies away
+            from the labeled region
     Returns:
-        out
+        voxels: numpy 2D array (n x 3)
+            list of voxels including gaussian noise 
     """
-    #Get non zero coordinates
-    Z, X, Y = volume.nonzero()
-    num_proteins = volume[Z, X, Y]
-    #Duplicate voxels
-    num_ab = np.round(num_proteins * antibody_amp).astype(np.uint32)
-    voxels = np.array((Z, X, Y)).transpose()
-    voxels = np.repeat(voxels, num_ab, axis = 0)
-    #Add gaussian noise to coordinates
-    n = voxels.shape[0]
-    ab_std = 0.01 * np.array(voxel_dim)
-    noise = np.stack([np.random.normal(0, std, n) for std in ab_std], axis=-1)
-    Z, X, Y = np.round(voxels + noise).astype(np.uint32).transpose()
-    #Create new volume
-    out = np.zeros_like(volume)
-    #Ignore out of bound errors
-    for i in range(n):
-        try:
-            out[Z[i], X[i], Y[i]] += 1
-        except:
-            pass
-
-    return out
+    ab_std = 200.0 / np.array(voxel_dim)#200 nm seems to work well as std
+    gaussian = np.stack([np.random.normal(0, std, len(voxels)) for std in ab_std], axis=-1)
+    #Get random subset
+    indices = np.arange(len(voxels))
+    np.random.shuffle(indices)
+    indices = indices[:int((1 - protein_noise) * len(voxels))]
+    #Set others to 0
+    gaussian[indices, :] = [0, 0, 0]
+    #Add noise
+    voxels = np.round(voxels + gaussian).astype(np.uint32)
+    #Make sure we don't get voxels which are out of bounds
+    voxels = np.clip(voxels, (0,0,0), np.array(volume_dim) - 1)
+    return voxels
 
