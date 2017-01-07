@@ -67,20 +67,31 @@ Each subsection shoudl contain the following parameters:
 #### Optics
 	
 *numerical_aperture* (float greater than 0): the numerical aperture of the system
+
 *focal_plane_depth* (integer greater than 1): the thickness of a z-slice in nanometers
+
 *objective_back_aperture* (float greater than 0): the objective back aperture of the system
+
 *exposure_time* (float greater than 0): how long photons are detected in seconds
+
 *objective_efficiency* (float between 0.0 and 1.0): the percentage of efficiency of the objective
+
 *detector_efficiency* (float between 0.0 and 1.0): the percentage of efficiency of the detector
+
 *objective_factor* (float greater or equal to 0.0): the objective lens, tipically 20x, 40x
+
 *pixel_size* (integer): the size of an output pixel in the microscope, in nanometers
+
 *baseline_noise* (integer): the average number of baseline photons detected by the system
 	
 *channels* : subsection containing a multiple channel parameters for different lasers. Each subsection has the following parameters. See brainbow_membrane.ini for an example on how to use multiple channels.
 
 *laser_wavelength* (ineteger between 200 and 1000): the wavelength of the laser in nanometers
+
 *laser_power* (float greater than 1.0): the power of the laser in Watts
+
 *laser_percentage* (float between 0.0 and 1.0): proportion of the laser power to use
+
 *laser_filter* (min, max integer tuple): the minimum and maximum wavelenghts in the filter, in nanometers
 
 #### Output
@@ -93,10 +104,15 @@ The ground truth is stored on a per fluorophore basis. For each fluorophore the 
 or grouped into a single volume containing all cells labeled by that fluorophore. The parameters are outlined below.
 
 *name* (string): a name for the experiment
+
 *path* (path): where to store the experiement's output
+
 *format* (string): may be one of 'tiff', 'gif' or 'image sequence', determines to output format for both the simulated stack and the ground truth
+
 *sim_channels* (string): may be one of "merged" or "splitted", if merged, and RGB volume is made for every 3 channels, otherwise a stack is made for each channel
+
 *gt_cells* (string): may be one of "merged ot "splitted", if merged, all cells are grouped in the same stack, otherwise, a volume if made for each cell
+
 *gt_region* (string): the cell region to use in the output, may be different that the annotated regions in the labeling layers.
 
 ## Run the Simulation
