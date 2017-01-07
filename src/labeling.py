@@ -51,7 +51,10 @@ def label(gt_dataset, volume_dim, voxel_dim, labeling_params):
     """
     labeled_volumes = dict()
     labeled_cells = dict()
-    for layer in labeling_params:
+    #Label in the order specified in the configuration
+    layers = sorted(labeling_params.keys())
+    for layer in layers:
+        print "Labeling {}".format(layer)
         fluorophore = labeling_params[layer]['fluorophore']
         volume, cells  = brainbow(gt_dataset, volume_dim, voxel_dim, **labeling_params[layer])
         if fluorophore in labeled_volumes:
@@ -100,24 +103,26 @@ def brainbow(gt_dataset, volume_dim, voxel_dim, region, labeling_density,\
         labeled_cells: set
             the set of cell_ids, indicating which cells were labeled
     """
-    labeled_cells = {cell_id for cell_id in gt_dataset if random_sample() < labeling_density}
+    to_label = {cell_id for cell_id in gt_dataset if random_sample() < labeling_density}
+    labeled_cells = set()
     if single_neuron: 
-        labeled_cells = {labeled_cells[0]}
+        to_label = {to_label[0]}
     #Create empty volume
     volume = np.zeros(volume_dim, np.uint32)
-    for cell_id in labeled_cells:
+    for cell_id in to_label:
         #Get cell data
         reg = gt_dataset[cell_id][region]
         if len(reg) == 0: continue
+        labeled_cells.add(cell_id)
         prob = np.ones(len(reg), np.float64) * 1.0 / len(reg)
         #Compute number of proteins to distribute
         mean_proteins = int(protein_density * len(reg) * np.prod(voxel_dim))
         num_proteins = np.random.poisson(mean_proteins)
         distribution = np.random.multinomial(num_proteins, prob, size=1).squeeze()
+        distribution = np.round(distribution * antibody_amp).astype(np.uint32)
         voxels = noise(reg, volume_dim, voxel_dim, protein_noise)
-        Z, X, Y = voxels.transpose()
-        for i in range(len(Z)):
-            volume[Z[i], X[i], Y[i]] += np.round(distribution[i] * antibody_amp).astype(np.uint32)
+        #add proteins to volume
+        np.add.at(volume, tuple(voxels.transpose()), distribution)
 
     return volume, labeled_cells
 

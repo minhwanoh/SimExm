@@ -25,13 +25,13 @@ run.py
 Main script to run the simulation.
 """
 
+import sys
 from configobj import ConfigObj, flatten_errors
 from validate import Validator
-import sys
 from src.load import load_gt 
 from src.labeling import label
 from src.optics import resolve
-from src.output import save
+from src.output import save, save_gt
 
 def run(config):
     """
@@ -41,8 +41,6 @@ def run(config):
     Args:
         config: dicitonary
             the configuration dict outputed by the configobj library
-    Returns:
-        None
     """
     gt_params = config['groundtruth']
     volume_dim = gt_params['bounds']
@@ -65,6 +63,7 @@ def run(config):
     #Save to desired output
     output_params = config['output']
     save(volumes, **output_params)
+    save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params, optics_params, **output_params)
     print "Done!"
 
 if __name__ == "__main__":
@@ -73,6 +72,7 @@ if __name__ == "__main__":
     #Read config file
     config_file = sys.argv[1]
     config = ConfigObj(config_file, list_values = True,  configspec='configspecs.ini')
+    #Validate input configuration
     validator = Validator()
     results = config.validate(validator)
 

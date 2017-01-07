@@ -23,11 +23,10 @@
 load.py
 
 Set of functions to read ground truth data into simulation format. 
-The main function is load_gt which loads the groudn truth data and returns
+The main function is load_gt which loads the ground truth data and returns
 the data in simulation format. The other methods are mainly helpers.
 """
 
-from itertools import product
 #Could consider using a different convolution library
 from scipy.signal import fftconvolve
 #Not the fastest image loading library but opencv is annoying to install
@@ -35,7 +34,6 @@ from scipy.signal import fftconvolve
 from scipy.misc import imread
 import numpy as np
 import os
-from matplotlib.pyplot import imshow, show
 
 
 def load_gt(image_path, offset, bounds, regions={}):
@@ -72,7 +70,8 @@ def load_gt(image_path, offset, bounds, regions={}):
     #Add addtional regions
     for name in regions:
         path = regions[name]['region_path']
-        data = load_images(image_path, offset, bounds)
+        data = load_images(path, offset, bounds)
+        data = data != 0# Only keep binary information for overlap
         loaded_regions.append(data)
         loaded_region_names.append(name)
 
@@ -147,15 +146,14 @@ def load_cells(main_gt_data, regions, region_names):
             of (z, x, y) tuples, where each tuple is a voxel.
     """
     cells = {}
-    d, w, h = main_gt_data.shape
-    for k, i, j in product(xrange(d), xrange(w), xrange(h)):
-        cell_id = main_gt_data[k, i, j]
-        if cell_id != 0:
-            cells.setdefault(cell_id, {name: [] for name in region_names})
-            for region, region_type in zip(regions, region_names): 
-                if region[k, i, j] != 0:
-                    cells[cell_id][region_type].append((k, i, j))
+    cell_ids = np.unique(main_gt_data)[1:]
+    for cell_id in cell_ids:
+        cells.setdefault(cell_id, {})
+        for region, region_name in zip(regions, region_names):
+            indices = np.where(np.multiply(main_gt_data, region) == cell_id)
+            cells[cell_id][region_name] = np.transpose(indices)
     return cells
+
 
 def split(gt):
     """
@@ -171,9 +169,7 @@ def split(gt):
         membrane: numpy 3d boolean array
             volume with 1 if the voxel is on the membrane of some cell, 0 otherwise
     """
-    kernel = edge_kernel()
-    edges = np.round(fftconvolve(gt.astype(np.float64), kernel, 'valid'))
-    edges = np.pad(edges, ((1,1), (1,1), (1,1)), 'constant')
+    edges = get_edges(gt)
     cytosol = edges == 0
     membrane = edges != 0
     return cytosol, membrane
@@ -186,6 +182,27 @@ def edge_kernel():
     edge_kernel = - 1.0 * np.ones([3, 3, 3], np.float64)
     edge_kernel[1, 1, 1] = 26.0
     return edge_kernel
+
+def get_edges(array):
+    """
+    Finds the location of edges by convolving with a 3D kernel.
+    An edge is any voxel that has a neighbour with a different value.
+    
+    Args:
+        array: numpy 3D array
+            the array to convolve
+    Returns:
+        out: numpy 3D array
+            the edge array, with the same shape as the input array
+            edges have a non zero value while non edges are set to 0.
+    """
+    kernel = edge_kernel()
+    conv = fftconvolve(array.astype(np.float64), kernel, 'valid')
+    conv = np.round(conv).astype(np.uint32)
+    conv = np.pad(conv, ((1,1), (1,1), (1,1)), 'constant')
+    return conv
+
+
 
 
 

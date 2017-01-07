@@ -45,8 +45,8 @@ def gaussian_psf(voxel_dim, numerical_aperture, laser_wavelength, **kwargs):
         kernel: numpy float64 3D array
             the point spread to use for convolution
     """
-    #800 nm is an upper bounds for the gaussian psf
-    shape = np.ceil(800.0 / np.array(voxel_dim)).astype(np.int)
+    #1000 nm is an upper bounds for the gaussian psf
+    shape = np.ceil(1000.0 / np.array(voxel_dim)).astype(np.int)
     #Compute size coefficient
     d, w, h = voxel_dim
     #Set bounds
@@ -76,7 +76,7 @@ def wolf_born_psf(voxel_dim, numerical_aperture, laser_wavelength, **kwargs):
             the point spread to use for convolution
     """
     d, w, h = voxel_dim
-    shape = np.ceil(800.0 / np.array(voxel_dim)).astype(np.int)
+    shape = np.ceil(1000.0 / np.array(voxel_dim)).astype(np.int)
     #e^2 - 1 = 6.389
     psf = np.zeros(shape, np.float64)
     refr_index = 1.33 #the gel used in ExM has essentially the same refractory index as water

@@ -29,9 +29,8 @@ Implements confocal light microscopy.
 import numpy as np
 from psf import gaussian_psf, wolf_born_psf
 from fluors import Fluorset
-from scipy.signal import fftconvolve as convolve
+from scipy.signal import fftconvolve
 from scipy.misc import imresize
-from tifffile import imsave
 
 def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_params):
     """
@@ -57,7 +56,10 @@ def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_par
     #Create volume
     volumes = []
     #Resolve each channel one by one
-    for channel in optics_params['channels']:
+    #Make sure they're sorted by name for consistency
+    channels = sorted(optics_params['channels'].keys())
+    for channel in channels:
+        print "Resolving {}".format(channel)
         vol = np.zeros(volume_dim, np.uint32)
         channel_params = optics_params['channels'][channel]
         #Compute photon count
@@ -66,16 +68,17 @@ def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_par
             params.update(channel_params)
             mean_photon = mean_photons(fluorophore, **params)
             Z, X, Y = np.nonzero(labeled_volumes[fluorophore])
-            photon_count = np.random.poisson(mean_photon, size = len(Z)).astype(np.uint32)
-            vol[Z, X, Y] += labeled_volumes[fluorophore][Z, X, Y] * photon_count
+            photons = np.random.poisson(mean_photon, size = len(Z)).astype(np.uint32)
+            photons = np.multiply(labeled_volumes[fluorophore][Z, X, Y], photons)
+            np.add.at(vol, (Z, X, Y), photons)
         #Convolve with point spread
         psf_voxel_dim = np.array(voxel_dim) * expansion_params['factor']
         psf = gaussian_psf(psf_voxel_dim, **params)
-        out = np.round(convolve(vol.astype(np.float64), psf, 'valid'))
+        out = np.round(fftconvolve(vol.astype(np.float64), psf, 'valid'))
         #Add noise
         out = np.add(out, baseline_volume(out.shape, **optics_params))
         #Optical scaling
-        out = scale(out, voxel_dim, expansion_params['factor'], **optics_params)
+        out = scale(out, voxel_dim, 'bilinear', expansion_params['factor'], **optics_params)
         #Normalize
         out = normalize(out)
         volumes.append(out)
@@ -114,23 +117,25 @@ def normalize(volume):
             the normalized volume
     """
     max = np.amax(volume)
-    print max
     if max == 0:#Fixes dividing by 0 error if nothing in the volume
         return volume.astype(np.uint8)
     normalized = volume * (255.0 / max)
     normalized = np.round(normalized).astype(np.uint8)
     return normalized
 
-def scale(volume, voxel_dim, expansion, objective_factor,
+def scale(volume, voxel_dim, interpolation, expansion, objective_factor,
             pixel_size, focal_plane_depth, **kwargs):
     """
-    Scales the output volume with the appropriate optics parameters.
+    Scales the output volume with the appropriate optics parameters
+    using nearest neighbour interpolation.
     
     Args:
         volume: numpy 3D array (z, x, y)
             the volume to scale
         voxel_dim: (z, x, y) tuple
             the dimensions of a voxel in nm
+        interpolation: string
+            one of 'nearest', 'bilinear', 'bicubic' and 'cubic'
         expansion: float
             the expansion factor
         objective_factor: float
@@ -148,7 +153,7 @@ def scale(volume, voxel_dim, expansion, objective_factor,
     z_step = np.ceil(1.0 / z_scale).astype(np.int)
     out = []
     for i in range(0, volume.shape[0], z_step):
-        im = imresize(volume[i, : ,:], xy_scale)
+        im = imresize(volume[i, : ,:], xy_scale, interp = interpolation)
         out.append(im)
     return np.array(out)
 
@@ -196,5 +201,5 @@ def mean_photons(fluorophore, exposure_time, objective_efficiency,\
     emitted_photons = excitation * qy * (ext_coeff * 1e2) * exposure_time *\
                       laser_intensity * (laser_wavelength * 1e-9) / (1e3 * CONSTANT)
     detected_photons = emitted_photons * emission * objective_efficiency * detector_efficiency
-    detected_photons = int(np.ceil(detected_photons))
+    detected_photons = int(np.round(detected_photons))
     return detected_photons
