@@ -6,7 +6,7 @@ The software is fully written in Python. The following section covers basic inst
 
 ##Installation
 
-The code works in python2 exclusivly. It should be easy to convert to python3 but it's untested.
+The code works in python2 exclusively. It should be easy to convert it to python3 but it's untested.
 I strongly suggest creating a virtual environment, with virtualenv or anaconda and then use the pip command above to install all the dependencies inside the environment. For instance, you can create a new environment "sim" by running:
 
 `conda create -n sim python=2`
@@ -16,7 +16,7 @@ To start your new environment and activate the change of path run:
 
 `source activate sim` 
 
-All dependencies currently used are: numpy, matplotlib, Pillow, scipy, images2gif, configobj and tifffile. 
+All dependencies currently used are: numpy, Pillow, scipy, images2gif, configobj and tifffile. 
 To install all at once, from the terminal, do:
 
 `pip install -r requirements.txt`  
@@ -28,23 +28,24 @@ or if you didn't  use a virtual environment:
 ## Config Specs
 
 The simulation is used through configuration files. We use the configobj module which provides a nice syntax and validation of the config files.
-The specifications are outlines in the configspecs.ini file. Example configurations can be found under ./examples. To create a new configuration file copy one of the templates in ./examples, ad modify to fit your needs. The config parameters are explained below. For more information see the in-code documentation.
+The specifications are outlines in the configspecs.ini file. Example configurations can be found under ./examples. To create a new configuration file copy one of the templates in ./examples, and modify it to fit your needs. The config parameters are explained below. For more information see the in-code documentation.
 
 #### Groundtruth
 
-*image_path* (string): indicates the location of the ground truth data. The data should be in the form of an image sequence, where each image represents a slice of the ground truth volume. In each image, pixel values should indicate what cell the pixel belongs to, or 0 if the pixel
-is located in extra-cellular space  
+*image_path* (string): indicates the location of the ground truth data. The data should be in the form of an image sequence, where each image represents a slice of the ground truth volume. In each image, pixel values should indicate what cell the pixel belongs to, or 0 if the pixel is located in extra-cellular space.
+
 *offset* (z, x, y tuple): tuple of length 3 representing where to start loading the data, in pixels. For instance, an offset of (10, 50, 50) means that images are loaded starting the 10th image in the given directory and each imaage is cropped so that the top left corner is at (50, 50).
 
 *bounds* (z, x, y tuple): tuple of length 3 representing the size of the data to load. Could be smaller than the actual size of the ground truth. This is the size in number of voxels.
+
 *voxel_dim*  (z, x, y tuple): tuple of length 3 representing the dimensions of a single voxel, in nanometers
 
-*regions*: a subsection in the configuration file which may contian many different regions. A region has a single parameter, region_path, which is a string pointing to where the data for that region is. By default the software automatically computes the cytosol and membrane regions, but additional annotations may be available. They are loadede by overlapping the region with the orgiinal cell segmentaiton to figure out which part of the cell is in the given region, for each cell. See synapse.ini for an example.
+*regions*: a subsection in the configuration file which may contian many different regions. A region has a single parameter, region_path, which is a string pointing to where the data for that region is. By default the software automatically computes the cytosol and membrane regions, but additional annotations may be available. They are loaded by overlapping the region with the orgiinal cell segmentaiton to figure out which part of the cell is in the given region, for each cell. See synapse.ini for an example.
 
 #### Labeling
 
 The labeling section should contain a subsection for each fluorophore used. See the example in brianbow_membrane.ini.
-Each subsection shoudl contain the following parameters:
+Each subsection should contain the following parameters:
 
 *fluorophore* (string) : the fluorophore to use, can be one of "ATTO390", "ATTO425", " ATTO430LS", "ATTO488", "ATTO490LS", "ATTO550", "ATTO647N", "ATTO700", "Alexa350" and "Alexa790". More info in src/fluors.py
 
@@ -72,7 +73,7 @@ Each subsection shoudl contain the following parameters:
 
 *objective_back_aperture* (float greater than 0): the objective back aperture of the system
 
-*exposure_time* (float greater than 0): how long photons are detected in seconds
+*exposure_time* (float greater than 0): how long photons are detected, in seconds
 
 *objective_efficiency* (float between 0.0 and 1.0): the percentage of efficiency of the objective
 
@@ -86,13 +87,13 @@ Each subsection shoudl contain the following parameters:
 	
 *channels* : subsection containing a multiple channel parameters for different lasers. Each subsection has the following parameters. See brainbow_membrane.ini for an example on how to use multiple channels.
 
-*laser_wavelength* (ineteger between 200 and 1000): the wavelength of the laser in nanometers
+*laser_wavelength* (ineteger between 200 and 1000): the wavelength of the laser, in nanometers
 
-*laser_power* (float greater than 1.0): the power of the laser in Watts
+*laser_power* (float greater than 1.0): the power of the lase, in Watts
 
 *laser_percentage* (float between 0.0 and 1.0): proportion of the laser power to use
 
-*laser_filter* (min, max integer tuple): the minimum and maximum wavelenghts in the filter, in nanometers
+*laser_filter* (min, max integer tuple): the minimum and maximum wavelengths of the filter, in nanometers
 
 #### Output
 
