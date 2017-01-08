@@ -134,7 +134,7 @@ def scale(volume, voxel_dim, interpolation, expansion, objective_factor,
     """
     Scales the output volume with the appropriate optics parameters
     using nearest neighbour interpolation.
-    
+
     Args:
         volume: numpy 3D array (z, x, y)
             the volume to scale
@@ -156,7 +156,7 @@ def scale(volume, voxel_dim, interpolation, expansion, objective_factor,
     """
     xy_scale  = (voxel_dim[1] * expansion * objective_factor)  / float(pixel_size)
     z_scale = voxel_dim[0] * expansion / float(focal_plane_depth)
-    z_step = np.ceil(1.0 / z_scale).astype(np.int)
+    z_step = np.round(1.0 / z_scale).astype(np.int)
     out = []
     for i in range(0, volume.shape[0], z_step):
         im = imresize(volume[i, : ,:], xy_scale, interp = interpolation)
