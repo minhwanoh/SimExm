@@ -45,6 +45,7 @@ from tifffile import imsave
 from optics import scale
 import numpy as np
 from PIL import Image
+from images2gif import writeGif
 
 def save_as_tiff(volume, path, name, rgb):
     """
