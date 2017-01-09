@@ -44,6 +44,7 @@ import os
 from tifffile import imsave
 from optics import scale
 import numpy as np
+from PIL import Image
 
 def save_as_tiff(volume, path, name, rgb):
     """
@@ -100,17 +101,20 @@ def save_as_image_sequence(volume, path, name, rgb):
     """
     sequence = [np.squeeze(volume[i]) for i in range(volume.shape[0])]
     digits = np.floor(np.log10(volume.shape[0]))
+    dest = path + name
+    if not os.path.isdir(dest):
+        os.mkdir(dest)
     for i in range(volume.shape[0]):
         #Compute appropriate number of 0's to add in front of the slice number
-        suffix = (digits - np.floor(np.log10(i))) * '0' if i > 0 else digits * '0'
-        dest = path + name + '_' + suffix + str(i) + '.png'
+        suffix = int(digits - np.floor(np.log10(i))) * '0' if i > 0 else int(digits) * '0'
+        im_path = dest + '/image_' + suffix + str(i) + '.png'
         if rgb:
             #'RGB' saves volume as rgb images
             im = Image.fromarray(np.squeeze(volume[i]), 'RGB')
         else:
             #'L' is used to save integer images
             im = Image.fromarray(np.squeeze(volume[i]), 'L')
-        im.save(dest)
+        im.save(im_path)
 
 def merge(volumes):
     """
