@@ -38,13 +38,14 @@ from scipy.signal import fftconvolve
 #Not the fastest image loading library but opencv is annoying to install
 #Open to suggestions!
 from scipy.misc import imread
+from tifffile import imread as tiffread
 import numpy as np
 import os
 
 
-def load_gt(image_path, offset, bounds, regions={}):
+def load_gt(image_path, offset, bounds, format, gt_cells, regions={}):
     """
-    Init method. Reads data from image_path, using the given offset and bounds and 
+    Reads data from image_path, using the given offset and bounds and 
     loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
     main ground truth segmentation and optionally reads out additional region segmentations.
 
@@ -57,6 +58,11 @@ def load_gt(image_path, offset, bounds, regions={}):
             the offset from which to load the data
         bounds: int (z, x, y) tuple
             the size of the ground truth data to load. Could be smaller than the actual size.
+        format: string
+            should be one of "tiff" or "image sequence"
+        gt_cells: string
+            one of "merged" ot "splitted". If merged, all cells are expected to be in the same volume.
+            Otherwise each cell should have its own ground truth volume.
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
@@ -67,7 +73,43 @@ def load_gt(image_path, offset, bounds, regions={}):
             a sub dict which points from cell regions to lists of voxels in the form 
             of (z, x, y) tuples, where each tuple is a voxel.
     """
-    main_data = load_images(image_path, offset, bounds)
+    load_function = load_merged_gt if gt_cells == 'merged' else load_splitted_gt
+    gt_dataset = load_function(image_path, offset, bounds, format, regions)
+    return gt_dataset
+
+
+def load_merged_gt(image_path, offset, bounds, format, regions={}):
+    """
+    Reads data from image_path, using the given offset and bounds and 
+    loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
+    main ground truth segmentation and optionally reads out additional region segmentations.
+    Cells are expected to be merged into a single volume, in tiff stack or image sequence format.
+
+    Args:
+        image_path: string
+            the path to the directory containing the main ground truth segmentation.
+            The images should be in a sequence (not a TIFF stack), 
+            and sorted by their file names 
+        offset: int (z, x, y) tuple
+            the offset from which to load the data
+        bounds: int (z, x, y) tuple
+            the size of the ground truth data to load. Could be smaller than the actual size.
+        format: string
+            should be one of "tiff" or "image sequence"
+        regions: dict region (string) -> image_path (string)
+            a simple dictionary pointing form addional region annotaiton to load
+            using the name of the region as the key and the image path as value
+
+    Returns:
+        gt_dataset: dict cell_id (string) -> region (string) -> voxels (list of (z, x, y) tuples)
+            the loaded data, in simulation format, with the cell_ids as keys pointing to 
+            a sub dict which points from cell regions to lists of voxels in the form 
+            of (z, x, y) tuples, where each tuple is a voxel.
+    """
+    if format == 'image sequence':
+        main_data = load_image_sequence(image_path, offset, bounds)
+    else:
+        main_data = load_tiff_stack(image_path, offset, bounds)
     #Compute cytosol and membrane 
     cytosol, membrane = split(main_data)
     loaded_regions = [cytosol, membrane]
@@ -84,6 +126,62 @@ def load_gt(image_path, offset, bounds, regions={}):
     #Load to dict
     gt_dataset = load_cells(main_data, loaded_regions, loaded_region_names)
     return gt_dataset
+
+
+def load_splitted_gt(image_path, offset, bounds, format, regions={}):
+    """
+    Reads data from image_path, using a stack or folder for each cell in the ground turth
+    and using the given offset and bounds. Loads the data into a cell_id->region->voxel
+    dictionary. Computes membranes for the main ground truth segmentation and optionally
+    reads out additional region segmentations. Each cell is expected to have its own
+    tiff stack or image sequence.
+
+    Args:
+        image_path: string
+            the path to the directory containing the main ground truth segmentation.
+            The data should be stored as s sqeuence of Tiff stacks, or a list of image 
+            sequence folers. Each stack/image sequence should contain the cell_id as 
+            pixel value and NOT in the file name, which is ignored.
+        offset: int (z, x, y) tuple
+            the offset from which to load the data
+        bounds: int (z, x, y) tuple
+            the size of the ground truth data to load. Could be smaller than the actual size.
+        format: string
+            should be one of "tiff" or "image sequence"
+        regions: dict region (string) -> image_path (string)
+            a simple dictionary pointing form addional region annotaiton to load
+            using the name of the region as the key and the image path as value
+
+    Returns:
+        gt_dataset: dict cell_id (string) -> region (string) -> voxels (list of (z, x, y) tuples)
+            the loaded data, in simulation format, with the cell_ids as keys pointing to 
+            a sub dict which points from cell regions to lists of voxels in the form 
+            of (z, x, y) tuples, where each tuple is a voxel.
+    """
+    gt_dataset = {}
+    #Get the list of stacks
+    stacks = parse(image_path)
+    #Specify data loading format
+    load_function = load_tiff_stack if format == 'tiff' else load_image_sequence
+    if image_path[-1] != '/': image_path += '/'
+    for stack in stacks:
+        main_data = load_function(image_path + stack, offset, bounds)
+        #Ignore empty stacks
+        cell_ids = np.unique(main_data)
+        if len(cell_ids) == 1: continue
+        cell_id = cell_ids[1]#Ignore 0
+        gt_dataset.setdefault(cell_id, {})
+        #Compute cytosol and membrane
+        cytosol, membrane = split(main_data)
+        gt_dataset[cell_id]['cytosol'] = np.transpose(np.where(cytosol))
+        gt_dataset[cell_id]['membrane'] = np.transpose(np.where(membrane))
+        #Add addtional regions
+        for name in regions:
+            path = regions[name]['region_path']
+            region_data = load_function(path, offset, bounds)
+            gt_dataset[cell_id][name] = np.transpose(np.where(region_data))
+    return gt_dataset
+
 
 def parse(image_path):
     """
@@ -106,7 +204,8 @@ def parse(image_path):
         images = images[1:]
     return images
 
-def load_images(image_path, offset, bounds):
+
+def load_image_sequence(image_path, offset, bounds):
     """
     Reads the image sequence located at image path into a 3d array
 
@@ -131,6 +230,29 @@ def load_images(image_path, offset, bounds):
         im = imread(image_path + images[z + i], mode = 'I')
         gt[i, :, :] = im[x : x + w, y : y + h]
     return gt
+
+
+def load_tiff_stack(image_path, offset, bounds):
+    """
+    Reads the tiff stack located at image path into a 3d array
+
+    Args:
+        image_path: string
+            the path where the tiff stack is located
+        offset: (z, x y) tuple
+            the offset from which to load the data. For instance an offset of (z, x, y)
+            starts at the zth image and uses the (x, y) pixel as top left
+        bounds: (z, x, y) tuple
+            the size of the data to load. Could be smaller than the full size of data,
+            should not be larger.
+    Returns:
+        gt: numpy uint32 3D array
+    """
+    gt = tiffread(image_path).astype(np.uint32)
+    d, w, h = bounds
+    z, x, y = offset
+    return gt[z:z+d, x:x+w, y:y+h]
+
 
 def load_cells(main_gt_data, regions, region_names):
     """
@@ -180,6 +302,7 @@ def split(gt):
     membrane = edges != 0
     return cytosol, membrane
 
+
 def edge_kernel():
     """
     Returns a 3d kernel for edge detection in an isotropic context.
@@ -188,6 +311,7 @@ def edge_kernel():
     edge_kernel = - 1.0 * np.ones([3, 3, 3], np.float64)
     edge_kernel[1, 1, 1] = 26.0
     return edge_kernel
+
 
 def get_edges(array):
     """

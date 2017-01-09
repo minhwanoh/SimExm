@@ -68,7 +68,7 @@ def gaussian_psf(voxel_dim, numerical_aperture, laser_wavelength, **kwargs):
 def wolf_born_psf(voxel_dim, numerical_aperture, laser_wavelength, **kwargs):
     """
     Implements the point spread function model given by Wolf and Born.
-    Currently unused.
+    In work, should not be used.
 
     Args:
         voxel_dim: (z, x, y) tuple

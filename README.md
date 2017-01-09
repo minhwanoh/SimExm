@@ -32,11 +32,17 @@ The specifications are outlines in the configspecs.ini file. Example configurati
 
 #### Groundtruth
 
-*image_path* (string): indicates the location of the ground truth data. The data should be in the form of an image sequence, where each image represents a slice of the ground truth volume. In each image, pixel values should indicate what cell the pixel belongs to, or 0 if the pixel is located in extra-cellular space.
+*image_path* (string): indicates the location of the ground truth data. The data should be in the form of an image sequence, where each image represents a slice of the ground truth volume or as Tiff stack. In each image, pixel values should indicate what cell the pixel belongs to, or 0 if the pixel is located in extra-cellular space. This is true for both formats, file names will be ingored.
 
 *offset* (z, x, y tuple): tuple of length 3 representing where to start loading the data, in pixels. For instance, an offset of (10, 50, 50) means that images are loaded starting the 10th image in the given directory and each imaage is cropped so that the top left corner is at (50, 50).
 
 *bounds* (z, x, y tuple): tuple of length 3 representing the size of the data to load. Could be smaller than the actual size of the ground truth. This is the size in number of voxels.
+
+*format* (string): one of "tiff" or "image sequence". Specifies which format is used in the groudn truth. If tiff, the path to the tiff stack should be specified in "image_path", otherwise a path to the folder containing the image sequence should be given
+in image_path.
+
+*gt_cells* (string): one of "merged" or "splitted". If merged, all cells are expected to be loaded from the same volume. If splitted, a different volume is expected for each cell. If the chosen format is tiff stack, the image_path should contain a list
+of tiff stacks. Otherwise, it should contain a list of folders, each containing the image sequence for a given cell.
 
 *voxel_dim*  (z, x, y tuple): tuple of length 3 representing the dimensions of a single voxel, in nanometers
 

@@ -250,4 +250,6 @@ def save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params,
                 volume = volume[d/2:-d/2 + 1, w/2: -w/2 + 1, h/2:-h/2 + 1]
                 #Optical rescaling
                 volume = scale(volume, voxel_dim, 'nearest', expansion_params['factor'], **optics_params)
+                #This fices a bug in the interpolation which rounds the non zero value to 255
+                volume[np.nonzero(volume)] = int(cell)
                 sf(volume, dest + fluorophore + '/', str(cell), False)
