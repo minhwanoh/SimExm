@@ -106,10 +106,8 @@ def load_merged_gt(image_path, offset, bounds, format, regions={}):
             a sub dict which points from cell regions to lists of voxels in the form 
             of (z, x, y) tuples, where each tuple is a voxel.
     """
-    if format == 'image sequence':
-        main_data = load_image_sequence(image_path, offset, bounds)
-    else:
-        main_data = load_tiff_stack(image_path, offset, bounds)
+    load_function = load_tiff_stack if format == 'tiff' else load_image_sequence
+    main_data = load_function(image_path, offset, bounds)
     #Compute cytosol and membrane 
     cytosol, membrane = split(main_data)
     loaded_regions = [cytosol, membrane]
@@ -118,7 +116,7 @@ def load_merged_gt(image_path, offset, bounds, format, regions={}):
     #Add addtional regions
     for name in regions:
         path = regions[name]['region_path']
-        data = load_images(path, offset, bounds)
+        data = load_function(path, offset, bounds)
         data = data != 0# Only keep binary information for overlap
         loaded_regions.append(data)
         loaded_region_names.append(name)
