@@ -33,10 +33,10 @@ Implements confocal light microscopy.
 """
 
 import numpy as np
-from psf import gaussian_psf, wolf_born_psf
+import psf
 from fluors import Fluorset
 from scipy.signal import fftconvolve
-from scipy.misc import imresize
+from tifffile import imsave
 
 def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_params):
     """
@@ -66,30 +66,85 @@ def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_par
     channels = sorted(optics_params['channels'].keys())
     for channel in channels:
         print "Resolving {}".format(channel)
-        vol = np.zeros(volume_dim, np.uint32)
+        channel_vol = np.zeros(volume_dim, np.uint32)
         channel_params = optics_params['channels'][channel]
-        #Compute photon count
+        #Each fluorophore may produce photons in the given channel
         for fluorophore in labeled_volumes:
+            #Merge parameters
             params = optics_params.copy()
             params.update(channel_params)
+            #Compute photon count
             mean_photon = mean_photons(fluorophore, **params)
-            Z, X, Y = np.nonzero(labeled_volumes[fluorophore])
-            photons = np.random.poisson(mean_photon, size = len(Z)).astype(np.uint32)
-            photons = np.multiply(labeled_volumes[fluorophore][Z, X, Y], photons)
-            np.add.at(vol, (Z, X, Y), photons)
-        #Convolve with point spread
-        psf_voxel_dim = np.array(voxel_dim) * expansion_params['factor']
-        psf = gaussian_psf(psf_voxel_dim, **params)
-        out = np.round(fftconvolve(vol.astype(np.float64), psf, 'valid'))
+            #Only spend time convolving if the fluorophore is not orthogonal to
+            #this channel
+            if mean_photon > 0:
+                fluo_vol = np.zeros(volume_dim, np.float64)
+                Z, X, Y = np.nonzero(labeled_volumes[fluorophore])
+                photons = np.random.poisson(mean_photon, size = len(Z)).astype(np.uint32)
+                photons = np.multiply(labeled_volumes[fluorophore][Z, X, Y], photons)
+                np.add.at(fluo_vol, (Z, X, Y), photons)
+                #Convolve with point spread
+                psf_vol = psf_volume(voxel_dim, expansion_params['factor'], fluorophore, **params)
+                imsave('/home/jeremy/volume2.tiff', psf_vol.astype(np.float32))
+                (d, w, h) = psf_vol.shape
+                #Resize fluo_vol for convolution
+                fluo_vol = np.pad(fluo_vol, ((d / 2, d /2), (w / 2, w /2), (h / 2, h / 2)), 'reflect')
+                channel_vol += np.round(fftconvolve(fluo_vol, psf_vol, 'valid')).astype(np.uint32)
         #Add noise
-        out = np.add(out, baseline_volume(out.shape, **optics_params))
+        channel_vol += baseline_volume(channel_vol.shape, **optics_params)
         #Optical scaling
-        out = scale(out, voxel_dim, 'bilinear', expansion_params['factor'], **optics_params)
+        channel_vol = scale(channel_vol, voxel_dim, expansion_params['factor'], **optics_params)
         #Normalize
-        out = normalize(out)
-        volumes.append(out)
+        channel_vol = normalize(channel_vol)
+        volumes.append(channel_vol)
 
     return volumes
+
+def psf_volume(voxel_dim, expansion, fluorophore, laser_wavelength, numerical_aperture,\
+                refractory_index, pinhole_radius, objective_factor, type, **kwargs):
+    """
+    Creates a point spread volume, using the given parameters.
+    
+    Args:
+        voxel_dim: (z, x, y) tuple
+            the dimensions of a voxel in nm
+        expansion: float
+            the expansion factor
+        fluorophore: string
+            the fluorophore that is excited
+        laser_wavelength: int
+            the wavelength of the excitation laser in nm
+        numerical_aperture:
+            the numerical aperture of the system
+        refractory_index:
+            the refractory index, tipically 1.33 for ExM
+        pinhole_radius:
+            the pinhole raids in microns
+        objective_factor: float
+            objective factor of the microscope, tipically 0, 20 or 40
+        type: string
+            one of 'confocal', 'widefield' or 'two photon'
+    Returns:
+        psf_vol: numpy 3d float64 array
+            the point spread function
+    """
+    fluorset = Fluorset()
+    f = fluorset.get_fluor(fluorophore)
+    #Map to psf type
+    psf_type = {'confocal': psf.CONFOCAL, 'widefield': psf.WIDEFIELD, 'two photon': psf.TWOPHOTON}
+    #Upper bound for psf size
+    upper_bound = 1000.0 
+    z, x, y = np.array(voxel_dim) * expansion
+    #Arguments
+    back_projected_radius = pinhole_radius / float(objective_factor)
+    #Fill args in dictionary
+    args = dict(shape=(16, 16), dims=(16 * z * 1e-3, 16 * x * 1e-3),\
+                ex_wavelen=laser_wavelength, em_wavelen=f.find_emission_peak(),\
+                num_aperture=numerical_aperture, refr_index=refractory_index,\
+                pinhole_radius=back_projected_radius, magnification = objective_factor)
+    #Compute psf
+    psf_vol = psf.PSF(psf.ISOTROPIC | psf_type[type], **args)
+    return psf_vol.volume()
 
 def baseline_volume(volume_dim, baseline_noise, **kwargs):
     """
@@ -102,14 +157,14 @@ def baseline_volume(volume_dim, baseline_noise, **kwargs):
         baseline_noise: integer 
             the mean number of photons of the poisson distribution
     Returns:
-        out: numpy 3D float64 arrat
+        out: numpy 3D uint32 array
             a volume of basline photon noise
     """
     (d, w, h) = volume_dim
     indices = np.indices((d, w, h), dtype=np.float64)
     gaussian = np.exp(-((indices[1] - w / 2.0)**2 / (0.5 * w**2) + (indices[2] - h / 2.0)**2 / (0.5 * h**2)))
     out = np.round(np.multiply(np.random.poisson(baseline_noise, size=volume_dim), gaussian))
-    return out
+    return out.astype(np.uint32)
 
 def normalize(volume):
     """
@@ -129,8 +184,8 @@ def normalize(volume):
     normalized = np.round(normalized).astype(np.uint8)
     return normalized
 
-def scale(volume, voxel_dim, interpolation, expansion, objective_factor,
-            pixel_size, focal_plane_depth, **kwargs):
+def scale(volume, voxel_dim, expansion, objective_factor,
+          pixel_size, focal_plane_depth, **kwargs):
     """
     Scales the output volume with the appropriate optics parameters
     using nearest neighbour interpolation.
@@ -140,8 +195,6 @@ def scale(volume, voxel_dim, interpolation, expansion, objective_factor,
             the volume to scale
         voxel_dim: (z, x, y) tuple
             the dimensions of a voxel in nm
-        interpolation: string
-            one of 'nearest', 'bilinear', 'bicubic' and 'cubic'
         expansion: float
             the expansion factor
         objective_factor: float
@@ -154,12 +207,25 @@ def scale(volume, voxel_dim, interpolation, expansion, objective_factor,
         out: numpt 3D array
             the scaled volume in all three axis
     """
-    xy_scale  = (voxel_dim[1] * expansion * objective_factor)  / float(pixel_size)
+    xy_step = np.round(float(pixel_size) / (voxel_dim[1] * expansion * objective_factor))
+    xy_scale = 1.0 / xy_step 
     z_scale = voxel_dim[0] * expansion / float(focal_plane_depth)
     z_step = np.round(1.0 / z_scale).astype(np.int)
     out = []
     for i in range(0, volume.shape[0], z_step):
-        im = imresize(volume[i, : ,:], xy_scale, interp = interpolation)
+        X, Y = np.nonzero(volume[i, :, :])
+        values = volume[i, X, Y]
+        #Rescale and round
+        X = np.round(xy_scale * X).astype(np.int64)
+        Y = np.round(xy_scale * Y).astype(np.int64)
+        #Create new image
+        d, w, h = np.ceil(np.array(volume.shape) * xy_scale) 
+        im = np.zeros((int(w), int(h)), np.uint32)
+        #Adding poisson removes some rounding artifacts
+        X = np.clip(X + np.random.poisson(0, size = len(X)), 0, w - 1)
+        Y = np.clip(Y + np.random.poisson(0, size = len(Y)), 0, h - 1)
+        #This allows to add to repetition of the same index
+        np.add.at(im, (X.astype(np.uint64), Y.astype(np.uint64)), values)
         out.append(im)
     return np.array(out)
 

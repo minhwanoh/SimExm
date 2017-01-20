@@ -43,7 +43,7 @@ import numpy as np
 import os
 
 
-def load_gt(image_path, offset, bounds, format, gt_cells, regions={}):
+def load_gt(image_path, offset, bounds, format, gt_cells, isotropic, regions={}):
     """
     Reads data from image_path, using the given offset and bounds and 
     loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
@@ -60,9 +60,14 @@ def load_gt(image_path, offset, bounds, format, gt_cells, regions={}):
             the size of the ground truth data to load. Could be smaller than the actual size.
         format: string
             should be one of "tiff" or "image sequence"
+        isotropic: boolean
+            if true, computes membranes with a 3d kernel, looking 
+            at the slices above and below. Otherwise, only computes membranes
+            with a 2D kernel.
         gt_cells: string
             one of "merged" ot "splitted". If merged, all cells are expected to be in the same volume.
             Otherwise each cell should have its own ground truth volume.
+
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
@@ -74,11 +79,11 @@ def load_gt(image_path, offset, bounds, format, gt_cells, regions={}):
             of (z, x, y) tuples, where each tuple is a voxel.
     """
     load_function = load_merged_gt if gt_cells == 'merged' else load_splitted_gt
-    gt_dataset = load_function(image_path, offset, bounds, format, regions)
+    gt_dataset = load_function(image_path, offset, bounds, format, isotropic, regions)
     return gt_dataset
 
 
-def load_merged_gt(image_path, offset, bounds, format, regions={}):
+def load_merged_gt(image_path, offset, bounds, format, isotropic, regions={}):
     """
     Reads data from image_path, using the given offset and bounds and 
     loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
@@ -96,6 +101,10 @@ def load_merged_gt(image_path, offset, bounds, format, regions={}):
             the size of the ground truth data to load. Could be smaller than the actual size.
         format: string
             should be one of "tiff" or "image sequence"
+        isotropic: boolean
+            if true, computes membranes with a 3d kernel, looking 
+            at the slices above and below. Otherwise, only computes membranes
+            with a 2D kernel.
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
@@ -109,7 +118,7 @@ def load_merged_gt(image_path, offset, bounds, format, regions={}):
     load_function = load_tiff_stack if format == 'tiff' else load_image_sequence
     main_data = load_function(image_path, offset, bounds)
     #Compute cytosol and membrane 
-    cytosol, membrane = split(main_data)
+    cytosol, membrane = split(main_data, isotropic)
     loaded_regions = [cytosol, membrane]
     loaded_region_names = ['cytosol', 'membrane']
 
@@ -126,7 +135,7 @@ def load_merged_gt(image_path, offset, bounds, format, regions={}):
     return gt_dataset
 
 
-def load_splitted_gt(image_path, offset, bounds, format, regions={}):
+def load_splitted_gt(image_path, offset, bounds, format, isotropic, regions={}):
     """
     Reads data from image_path, using a stack or folder for each cell in the ground turth
     and using the given offset and bounds. Loads the data into a cell_id->region->voxel
@@ -146,6 +155,10 @@ def load_splitted_gt(image_path, offset, bounds, format, regions={}):
             the size of the ground truth data to load. Could be smaller than the actual size.
         format: string
             should be one of "tiff" or "image sequence"
+        isotropic: boolean
+            if true, computes membranes with a 3d kernel, looking 
+            at the slices above and below. Otherwise, only computes membranes
+            with a 2D kernel.
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
@@ -170,7 +183,7 @@ def load_splitted_gt(image_path, offset, bounds, format, regions={}):
         cell_id = cell_ids[1]#Ignore 0
         gt_dataset.setdefault(cell_id, {})
         #Compute cytosol and membrane
-        cytosol, membrane = split(main_data)
+        cytosol, membrane = split(main_data, isotropic)
         gt_dataset[cell_id]['cytosol'] = np.transpose(np.where(cytosol))
         gt_dataset[cell_id]['membrane'] = np.transpose(np.where(membrane))
         #Add addtional regions
@@ -281,7 +294,7 @@ def load_cells(main_gt_data, regions, region_names):
     return cells
 
 
-def split(gt):
+def split(gt, isotropic):
     """
     Takea a ground truth volume, and splits it between membrane and cytosol
     by convolving with an edge kernel
@@ -289,29 +302,43 @@ def split(gt):
     Args:
         gt: numpy 3d uint32 array
             the 3d volume to convolve with the edge kernel
+        isotropic: boolean
+            if true, computes membranes with a 3d kernel, looking 
+            at the slices above and below. Otherwise, only computes membranes
+            with a 2D kernel.
     Returns:
         cytosol: numpy 3d boolean array
             volume with 1 if the voxel is in the cytosol of some cell, 0 otherwise
         membrane: numpy 3d boolean array
             volume with 1 if the voxel is on the membrane of some cell, 0 otherwise
     """
-    edges = get_edges(gt)
+    edges = get_edges(gt, isotropic)
     cytosol = edges == 0
     membrane = edges != 0
     return cytosol, membrane
 
 
-def edge_kernel():
+def edge_kernel(isotropic):
     """
     Returns a 3d kernel for edge detection in an isotropic context.
     A voxel is an edge if any of its neighbours has a different cell_id
+    
+    Args:
+        isotropic: boolean
+            if true, computes membranes with a 3d kernel, looking 
+            at the slices above and below. Otherwise, only computes membranes
+            with a 2D kernel.
     """
-    edge_kernel = - 1.0 * np.ones([3, 3, 3], np.float64)
-    edge_kernel[1, 1, 1] = 26.0
+    if isotropic:
+        edge_kernel = - 1.0 * np.ones([3, 3, 3], np.float64)
+        edge_kernel[1, 1, 1] = 26.0
+    else:
+        edge_kernel = - 1.0 * np.ones([1, 3, 3], np.float64)
+        edge_kernel[0, 1, 1] = 8
     return edge_kernel
 
 
-def get_edges(array):
+def get_edges(array, isotropic):
     """
     Finds the location of edges by convolving with a 3D kernel.
     An edge is any voxel that has a neighbour with a different value.
@@ -319,15 +346,22 @@ def get_edges(array):
     Args:
         array: numpy 3D array
             the array to convolve
+        isotropic: boolean
+            if true, computes membranes with a 3d kernel, looking 
+            at the slices above and below. Otherwise, only computes membranes
+            with a 2D kernel.
     Returns:
         out: numpy 3D array
             the edge array, with the same shape as the input array
             edges have a non zero value while non edges are set to 0.
     """
-    kernel = edge_kernel()
+    kernel = edge_kernel(isotropic)
     conv = fftconvolve(array.astype(np.float64), kernel, 'valid')
     conv = np.round(conv).astype(np.uint32)
-    conv = np.pad(conv, ((1,1), (1,1), (1,1)), 'constant')
+    if isotropic:
+        conv = np.pad(conv, ((1,1), (1,1), (1,1)), 'constant')
+    else:
+        conv = np.pad(conv, ((0,0), (1,1), (1,1)), 'constant')
     return conv
 
 

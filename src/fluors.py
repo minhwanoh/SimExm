@@ -138,6 +138,13 @@ class Fluorophore:
         raw_data = np.array([s.split("\t") for s in raw_data], dtype=float)
         return raw_data
 
+    def find_emission_peak(self):
+        """Returns the emission peak for that fluorophore"""
+        raw_data = self.get_emission_file()
+        index = np.argmax(raw_data[:, 1])
+        return raw_data[index, 0]
+        
+
     def find_excitation(self, wavelength):
         """Returns the excitation value of the given fluorophore, 
         at the given (int) wavelenght in nm"""

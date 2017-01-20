@@ -46,6 +46,8 @@ of tiff stacks. Otherwise, it should contain a list of folders, each containing 
 
 *voxel_dim*  (z, x, y tuple): tuple of length 3 representing the dimensions of a single voxel, in nanometers
 
+*isotropic* (boolean): Choose false if the voxel dimension of the ground truth data is not isotropic.
+
 *regions*: a subsection in the configuration file which may contian many different regions. A region has a single parameter, region_path, which is a string pointing to where the data for that region is. By default the software automatically computes the cytosol and membrane regions, but additional annotations may be available. They are loaded by overlapping the region with the orgiinal cell segmentaiton to figure out which part of the cell is in the given region, for each cell. See synapse.ini for an example.
 
 #### Labeling

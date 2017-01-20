@@ -42,7 +42,7 @@ and there is overlap.
 
 import os
 from tifffile import imsave
-from optics import scale
+from scipy.misc import imresize
 import numpy as np
 from PIL import Image
 from images2gif import writeGif
@@ -184,7 +184,7 @@ def save(volumes, path, name, sim_channels, format, **kwargs):
             sf(vol, dest + '/', 'channel_{}'.format(i), False)
             i += 1
 
-def save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params,
+def save_gt(gt_dataset, labeled_cells, volume_dim, out_dim, voxel_dim, expansion_params,
              optics_params, path, name, gt_cells, gt_region, format, **kwargs):
     """
     Saves the ground truth stack with the given output parameters.
@@ -198,6 +198,8 @@ def save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params,
             dictionary contraining the cell_ids labeled by each of the fluorophores
         volume_dim: (z, x, y) integer tuples
             the dimensions of the original volume
+        volume_dim: (z, x, y) integer tuples
+            the dimensions of the output volume
         path: string
             path where to save the ground truth
         name:
@@ -224,10 +226,6 @@ def save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params,
         os.mkdir(dest)
 
     sf = SAVE_FUNCTION[format]
-    #Use the shape of the point spread function for resizing,
-    #since convolution is used in valid mode in the optics
-    psf_voxel_dim = np.array(voxel_dim) * expansion_params['factor']
-    (d, w, h) = 2 * np.ceil(1000.0 / psf_voxel_dim).astype(np.int) - 1
     for fluorophore in labeled_cells:
         if not os.path.isdir(dest + fluorophore):
             os.mkdir(dest + fluorophore)
@@ -239,11 +237,12 @@ def save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params,
                 voxels = gt_dataset[cell][gt_region]
                 #Fill volume with cell_id
                 volume[tuple(voxels.transpose())] = int(cell)
-            #Remove psf edge effect
-            volume = volume[d/2:-d/2 + 1, w/2: -w/2 + 1, h/2:-h/2 + 1]
             #Optical resclaing
-            volume = scale(volume, voxel_dim, 'nearest', expansion_params['factor'], **optics_params)
-            sf(volume, dest + fluorophore + '/', 'all_cells', False)
+            z_step = int(np.round(volume.shape[0] / float(out_dim[0])))
+            out = np.zeros(out_dim, np.uint32)
+            for i in range(0, volume.shape[0], z_step):
+                out[i // z_step] = imresize(volume[i], (out_dim[1], out_dim[2]), 'nearest')
+            sf(out, dest + fluorophore + '/', 'all_cells', False)
         else:
             #Save each cell seperatly
             for cell in cells:
@@ -251,10 +250,11 @@ def save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params,
                 volume = np.zeros(volume_dim, np.uint32)
                 voxels = gt_dataset[cell][gt_region]
                 volume[tuple(voxels.transpose())] = int(cell)
-                #Remove psf edge effect
-                volume = volume[d/2:-d/2 + 1, w/2: -w/2 + 1, h/2:-h/2 + 1]
                 #Optical rescaling
-                volume = scale(volume, voxel_dim, 'nearest', expansion_params['factor'], **optics_params)
+                z_step = int(np.round(volume.shape[0] / float(out_dim[0])))
+                out = np.zeros(out_dim, np.uint32)
+                for i in range(0, volume.shape[0], z_step):
+                    out[i // z_step] = imresize(volume[i], (out_dim[1], out_dim[2]), 'nearest')
                 #This fices a bug in the interpolation which rounds the non zero value to 255
-                volume[np.nonzero(volume)] = int(cell)
-                sf(volume, dest + fluorophore + '/', str(cell), False)
+                out[np.nonzero(out)] = int(cell)
+                sf(out, dest + fluorophore + '/', str(cell), False)

@@ -69,7 +69,8 @@ def run(config):
     #Save to desired output
     output_params = config['output']
     save(volumes, **output_params)
-    save_gt(gt_dataset, labeled_cells, volume_dim, voxel_dim, expansion_params, optics_params, **output_params)
+    save_gt(gt_dataset, labeled_cells, volume_dim, volumes[0].shape, voxel_dim,\
+            expansion_params, optics_params, **output_params)
     print "Done!"
 
 if __name__ == "__main__":
