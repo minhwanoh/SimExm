@@ -25,7 +25,7 @@ or if you didn't  use a virtual environment:
 
 `sudo pip install -r requirements.txt`
 
-Finally, you can go ahead and compile the psf module, courtesy of Christophoe Golke: http://www.lfd.uci.edu/~gohlke/.
+Finally, you can go ahead and compile the psf module, courtesy of Christoph Gohlke: http://www.lfd.uci.edu/~gohlke/.
 
 `python setup.py build_ext --inplace`
 
