@@ -36,7 +36,6 @@ import numpy as np
 import psf
 from fluors import Fluorset
 from scipy.signal import fftconvolve
-from tifffile import imsave
 
 def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_params):
     """
@@ -85,7 +84,6 @@ def resolve(labeled_volumes, volume_dim, voxel_dim, expansion_params, optics_par
                 np.add.at(fluo_vol, (Z, X, Y), photons)
                 #Convolve with point spread
                 psf_vol = psf_volume(voxel_dim, expansion_params['factor'], fluorophore, **params)
-                imsave('/home/jeremy/volume2.tiff', psf_vol.astype(np.float32))
                 (d, w, h) = psf_vol.shape
                 #Resize fluo_vol for convolution
                 fluo_vol = np.pad(fluo_vol, ((d / 2, d /2), (w / 2, w /2), (h / 2, h / 2)), 'reflect')
@@ -133,15 +131,15 @@ def psf_volume(voxel_dim, expansion, fluorophore, laser_wavelength, numerical_ap
     #Map to psf type
     psf_type = {'confocal': psf.CONFOCAL, 'widefield': psf.WIDEFIELD, 'two photon': psf.TWOPHOTON}
     #Upper bound for psf size
-    upper_bound = 1000.0 
+    precision = 16
     z, x, y = np.array(voxel_dim) * expansion
     #Arguments
     back_projected_radius = pinhole_radius / float(objective_factor)
     #Fill args in dictionary
-    args = dict(shape=(16, 16), dims=(16 * z * 1e-3, 16 * x * 1e-3),\
+    args = dict(shape=(precision, precision), dims=(precision * z * 1e-3, precision * x * 1e-3),\
                 ex_wavelen=laser_wavelength, em_wavelen=f.find_emission_peak(),\
                 num_aperture=numerical_aperture, refr_index=refractory_index,\
-                pinhole_radius=back_projected_radius, magnification = objective_factor)
+                pinhole_radius=back_projected_radius, magnification = 1)
     #Compute psf
     psf_vol = psf.PSF(psf.ISOTROPIC | psf_type[type], **args)
     return psf_vol.volume()
@@ -207,8 +205,14 @@ def scale(volume, voxel_dim, expansion, objective_factor,
         out: numpt 3D array
             the scaled volume in all three axis
     """
-    xy_step = np.round(float(pixel_size) / (voxel_dim[1] * expansion * objective_factor))
-    xy_scale = 1.0 / xy_step 
+    xy_step = float(pixel_size) / (voxel_dim[1] * expansion * objective_factor)
+    #This removes rounding artifacts, by binning with an integer number of pixels
+    if xy_step < 1:
+        xy_scale = 1.0 / xy_step 
+        xy_scale = np.round(xy_scale)
+    else:
+        xy_step = np.round(xy_step)
+        xy_scale = 1.0 / xy_step 
     z_scale = voxel_dim[0] * expansion / float(focal_plane_depth)
     z_step = np.round(1.0 / z_scale).astype(np.int)
     out = []
@@ -216,14 +220,15 @@ def scale(volume, voxel_dim, expansion, objective_factor,
         X, Y = np.nonzero(volume[i, :, :])
         values = volume[i, X, Y]
         #Rescale and round
-        X = np.round(xy_scale * X).astype(np.int64)
-        Y = np.round(xy_scale * Y).astype(np.int64)
+        X = np.floor(xy_scale * X).astype(np.int64)
+        Y = np.floor(xy_scale * Y).astype(np.int64)
         #Create new image
         d, w, h = np.ceil(np.array(volume.shape) * xy_scale) 
         im = np.zeros((int(w), int(h)), np.uint32)
-        #Adding poisson removes some rounding artifacts
-        X = np.clip(X + np.random.poisson(0, size = len(X)), 0, w - 1)
-        Y = np.clip(Y + np.random.poisson(0, size = len(Y)), 0, h - 1)
+        #Adding poisson if the volume is expanded, to avoid grid-like images
+        if xy_scale > 1:
+            X = np.clip(X + np.random.poisson(int(xy_scale), size = len(X)), 0, w - 1)
+            Y = np.clip(Y + np.random.poisson(int(xy_scale), size = len(Y)), 0, h - 1)
         #This allows to add to repetition of the same index
         np.add.at(im, (X.astype(np.uint64), Y.astype(np.uint64)), values)
         out.append(im)
