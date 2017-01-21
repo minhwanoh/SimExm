@@ -147,7 +147,7 @@ print "Labeling barcodes and imaging..."
 #Create barcode locations
 barcode_locs = {}
 for cell_id in cells:
-    barcode_locs[cell_id] = {'synapse': np.empty(), 'cytosol': np.empty()}
+    barcode_locs[cell_id] = {'synapse': np.empty(0), 'cytosol': np.empty(0)}
     for region, barcode_density in [('synapse', barcode_density_synapse), ('cytosol', barcode_density_cytosol)]:
         reg = np.array(gt_dataset[cell_id][region])
         if len(reg) == 0: continue
