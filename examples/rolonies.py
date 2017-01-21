@@ -14,7 +14,7 @@ import json
 #####################################
 
 #Volume dimension (z, x, y) in # voxels to load as ground truth
-volume_dim = (710, 1100, 376)
+volume_dim = (375, 710, 1100)
 #Voxel dimension (z, x, y) in nanometers
 voxel_dim = (40, 32, 32)
 #Where to start loading the data, defaults to (0,0,0)
