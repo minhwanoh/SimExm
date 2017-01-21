@@ -147,11 +147,11 @@ print "Labeling barcodes and imaging..."
 #Create barcode locations
 barcode_locs = {}
 for cell_id in cells:
-    barcode_locs[cell_id] = {}
+    barcode_locs[cell_id] = {'synapse': [], 'cytosol': []}
     for region, barcode_density in [('synapse', barcode_density_synapse), ('cytosol', barcode_density_cytosol)]:
         reg = np.array(gt_dataset[cell_id][region])
         if len(reg) == 0: continue
-        #barcode synapse
+        #Compute number of rolonies
         barcode_mean = int(barcode_density * len(reg))
         num_barcodes = np.random.poisson(barcode_mean)
         #Select which voxels will provide a center for a rolonie
