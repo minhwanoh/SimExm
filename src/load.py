@@ -184,13 +184,16 @@ def load_splitted_gt(image_path, offset, bounds, format, isotropic, regions={}):
         gt_dataset.setdefault(cell_id, {})
         #Compute cytosol and membrane
         cytosol, membrane = split(main_data, isotropic)
-        gt_dataset[cell_id]['cytosol'] = np.transpose(np.where(cytosol))
-        gt_dataset[cell_id]['membrane'] = np.transpose(np.where(membrane))
+        cytosol_voxels = np.where(np.multiply(main_data, cytosol) == cell_id)
+        membrane_voxels = np.where(np.multiply(main_data, membrane) == cell_id)
+        gt_dataset[cell_id]['cytosol'] = np.transpose(cytosol_voxels)
+        gt_dataset[cell_id]['membrane'] = np.transpose(membrane_voxels)
         #Add addtional regions
         for name in regions:
             path = regions[name]['region_path']
             region_data = load_function(path, offset, bounds)
-            gt_dataset[cell_id][name] = np.transpose(np.where(region_data))
+            region_voxels = np.where(np.multiply(main_data, region_data) == cell_id)
+            gt_dataset[cell_id][name] = np.transpose(region_voxels)
     return gt_dataset
 
 
