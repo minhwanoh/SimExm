@@ -27,7 +27,6 @@
 
 """
 load.py
-
 Set of functions to read ground truth data into simulation format. 
 The main function is load_gt which loads the ground truth data and returns
 the data in simulation format. The other methods are mainly helpers.
@@ -48,7 +47,6 @@ def load_gt(image_path, offset, bounds, format, gt_cells, isotropic, regions={})
     Reads data from image_path, using the given offset and bounds and 
     loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
     main ground truth segmentation and optionally reads out additional region segmentations.
-
     Args:
         image_path: string
             the path to the directory containing the main ground truth segmentation.
@@ -67,11 +65,9 @@ def load_gt(image_path, offset, bounds, format, gt_cells, isotropic, regions={})
         gt_cells: string
             one of "merged" ot "splitted". If merged, all cells are expected to be in the same volume.
             Otherwise each cell should have its own ground truth volume.
-
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
-
     Returns:
         gt_dataset: dict cell_id (string) -> region (string) -> voxels (list of (z, x, y) tuples)
             the loaded data, in simulation format, with the cell_ids as keys pointing to 
@@ -89,7 +85,6 @@ def load_merged_gt(image_path, offset, bounds, format, isotropic, regions={}):
     loads the data into a cell_id->region->voxel dictionary. Computes membranes for the
     main ground truth segmentation and optionally reads out additional region segmentations.
     Cells are expected to be merged into a single volume, in tiff stack or image sequence format.
-
     Args:
         image_path: string
             the path to the directory containing the main ground truth segmentation.
@@ -108,7 +103,6 @@ def load_merged_gt(image_path, offset, bounds, format, isotropic, regions={}):
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
-
     Returns:
         gt_dataset: dict cell_id (string) -> region (string) -> voxels (list of (z, x, y) tuples)
             the loaded data, in simulation format, with the cell_ids as keys pointing to 
@@ -142,7 +136,6 @@ def load_splitted_gt(image_path, offset, bounds, format, isotropic, regions={}):
     dictionary. Computes membranes for the main ground truth segmentation and optionally
     reads out additional region segmentations. Each cell is expected to have its own
     tiff stack or image sequence.
-
     Args:
         image_path: string
             the path to the directory containing the main ground truth segmentation.
@@ -162,7 +155,6 @@ def load_splitted_gt(image_path, offset, bounds, format, isotropic, regions={}):
         regions: dict region (string) -> image_path (string)
             a simple dictionary pointing form addional region annotaiton to load
             using the name of the region as the key and the image path as value
-
     Returns:
         gt_dataset: dict cell_id (string) -> region (string) -> voxels (list of (z, x, y) tuples)
             the loaded data, in simulation format, with the cell_ids as keys pointing to 
@@ -202,7 +194,6 @@ def parse(image_path):
     Parses the given image directory path by
     fixing the path and ignoring hidden files
     Note that the directory should only contain images
-
     Args:
         image_path: string
             the image directory from which to read
@@ -222,7 +213,6 @@ def parse(image_path):
 def load_image_sequence(image_path, offset, bounds):
     """
     Reads the image sequence located at image path into a 3d array
-
     Args:
         image_path: string
             the path where the image sequence is located
@@ -249,7 +239,6 @@ def load_image_sequence(image_path, offset, bounds):
 def load_tiff_stack(image_path, offset, bounds):
     """
     Reads the tiff stack located at image path into a 3d array
-
     Args:
         image_path: string
             the path where the tiff stack is located
@@ -272,7 +261,6 @@ def load_cells(main_gt_data, regions, region_names):
     """
     Given the cell segmentation and region annotations,
     loads the ground truth into simulation format.
-
     Args:
         main_gt_data: numpy 3D uint 32 array
             the main cell segmentation
@@ -301,7 +289,6 @@ def split(gt, isotropic):
     """
     Takea a ground truth volume, and splits it between membrane and cytosol
     by convolving with an edge kernel
-
     Args:
         gt: numpy 3d uint32 array
             the 3d volume to convolve with the edge kernel
@@ -366,10 +353,3 @@ def get_edges(array, isotropic):
     else:
         conv = np.pad(conv, ((0,0), (1,1), (1,1)), 'constant')
     return conv
-
-
-
-
-
-
-

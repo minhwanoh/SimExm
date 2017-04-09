@@ -51,15 +51,17 @@ def run(config):
     gt_params = config['groundtruth']
     volume_dim = gt_params['bounds']
     voxel_dim = gt_params['voxel_dim']
+    gene_copies = gt_params['gene_copies']
     #Remove voxel dim so that we can pass gt_params to the load_gt function
     del gt_params['voxel_dim']
+    del gt_params['gene_copies']
 
     print "Loading data..."
     gt_dataset = load_gt(**gt_params)
 
     print "Labeling..."
     labeling_params = config['labeling']
-    labeled_volumes, labeled_cells = label(gt_dataset, volume_dim, voxel_dim, labeling_params)
+    labeled_volumes, labeled_cells = label(gt_dataset, volume_dim, voxel_dim, labeling_params, gene_copies)
 
     print "Imaging..."
     expansion_params = config['expansion']
@@ -74,20 +76,23 @@ def run(config):
     print "Done!"
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise IOError, 'Please give a single config file as argument'
+    n = len(sys.argv)
+    if len(sys.argv) < 2:
+        raise IOError, 'Please give a config file as argument'
     #Read config file
-    config_file = sys.argv[1]
-    config = ConfigObj(config_file, list_values = True,  configspec='configspecs.ini')
-    #Validate input configuration
-    validator = Validator()
-    results = config.validate(validator)
+    for i in range(1,n):
+        print sys.argv[i]
+        config_file = sys.argv[i]
+        config = ConfigObj(config_file, list_values = True,  configspec='configspecs.ini')
+        #Validate input configuration
+        validator = Validator()
+        results = config.validate(validator)
 
-    if results != True:
-        for (section_list, key, _) in flatten_errors(config, results):
-            if key is not None:
-                print 'The "%s" key in the section "%s" failed validation' % (key, ', '.join(section_list))
-            else:
-                print 'The following section was missing:%s ' % ', '.join(section_list)
-    #Run simulation
-    run(config)
+        if results != True:
+            for (section_list, key, _) in flatten_errors(config, results):
+                if key is not None:
+                    print 'The "%s" key in the section "%s" failed validation' % (key, ', '.join(section_list))
+                else:
+                    print 'The following section was missing:%s ' % ', '.join(section_list)
+        #Run simulation
+        run(config)

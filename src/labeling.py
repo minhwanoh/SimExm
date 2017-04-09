@@ -34,7 +34,7 @@ Implements the brainbow method.
 import numpy as np
 from numpy.random import random_sample
 
-def label(gt_dataset, volume_dim, voxel_dim, labeling_params):
+def label(gt_dataset, volume_dim, voxel_dim, labeling_params, gene_copies):
     """
     Labeles the given ground truth dataset according to the config parameters.
     Creates a 3d volume for each fluorophore.
@@ -62,13 +62,14 @@ def label(gt_dataset, volume_dim, voxel_dim, labeling_params):
     for layer in layers:
         print "Labeling {}".format(layer)
         fluorophore = labeling_params[layer]['fluorophore']
-        volume, cells  = brainbow(gt_dataset, volume_dim, voxel_dim, **labeling_params[layer])
-        if fluorophore in labeled_volumes:
-            labeled_volumes[fluorophore] += volume
-            labeled_cells[fluorophore] |= cells
-        else:
-            labeled_volumes[fluorophore] = volume
-            labeled_cells[fluorophore] = cells
+        for i in range(int(gene_copies)):
+            volume, cells  = brainbow(gt_dataset, volume_dim, voxel_dim, **labeling_params[layer])
+            if fluorophore in labeled_volumes:
+                labeled_volumes[fluorophore] += volume
+                labeled_cells[fluorophore] |= cells
+            else:
+                labeled_volumes[fluorophore] = volume
+                labeled_cells[fluorophore] = cells
     return labeled_volumes, labeled_cells
 
 
