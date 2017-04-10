@@ -19,7 +19,7 @@ laser_filter = [[475, 550], [550, 630], [630, 720], [720, 900], [450, 550], [600
 
 def writeConfigFiles(cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor, 
 	gene_copies, fluorophores, laser_wavelength, laser_filter):
-	path = "/Users/min-hwan/Documents/SimExm/input/set3/%scells_%sch" % (cellCount, channelCount)
+	path = "input/set3/%scells_%sch" % (cellCount, channelCount)
 
 	groundtruth = """#Ground truth parameters
 [groundtruth]
@@ -101,7 +101,7 @@ baseline_noise = %s
 [output]
 
 name = "%scells_%sch_%sbn_%spn_%spd_%sef"
-path = "/Users/min-hwan/Documents/SimExm/output"
+path = "output"
 format =  "tiff"
 sim_channels = "merged"
 gt_cells = "splitted"
