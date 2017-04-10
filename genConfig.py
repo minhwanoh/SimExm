@@ -1,6 +1,6 @@
 channelCounts = [3, 4, 5, 6]
 cellCounts = [5, 9, 13]
-baseline_noises = [0, 2000, 5000]
+baseline_noises = [0, 4000, 8000]
 protein_noises = [0, 0.1, 0.2]
 protein_densities = [1e-6, 1e-7, 1e-8]
 
