@@ -1,3 +1,4 @@
+setnumber = 2
 channelCounts = [3, 4, 5, 6]
 cellCounts = [5, 9, 13]
 baseline_noises = [0, 4000, 8000]
@@ -17,9 +18,9 @@ laser_filter = [[475, 550], [550, 630], [630, 720], [720, 900], [450, 550], [600
 
 
 
-def writeConfigFiles(cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor, 
+def writeConfigFiles(setnumber, cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor, 
 	gene_copies, fluorophores, laser_wavelength, laser_filter):
-	path = "input/set2/%scells_%sch" % (cellCount, channelCount)
+	path = "input/set%s/%scells_%sch" % (setnumber, cellCount, channelCount)
 
 	groundtruth = """#Ground truth parameters
 [groundtruth]
@@ -100,13 +101,13 @@ baseline_noise = %s
 	output = """
 [output]
 
-name = "%scells_%sch_%sbn_%spn_%spd_%sef"
+name = "set%s/%scells_%sch_%sbn_%spn_%spd_%sef"
 path = "output"
 format =  "tiff"
 sim_channels = "merged"
 gt_cells = "splitted"
 gt_region = "membrane"
-	""" % (cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor)
+	""" % (setnumber, cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor)
 
 	filename = "config/bb_%scells_%sch_%sbn_%spn_%spd_%sef.ini" % (cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor)
 
@@ -134,7 +135,7 @@ for ch in range(len(channelCounts)):
 	channelCount = channelCounts[ch]
 	for cC in range(len(cellCounts)):
 		cellCount = cellCounts[cC]
-		writeConfigFiles(cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
+		writeConfigFiles(setnumber, cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
 			gene_copies, fluorophores, laser_wavelength, laser_filter)
 
 
@@ -144,7 +145,7 @@ for ch in range(len(channelCounts)):
 	channelCount = channelCounts[ch]
 	for bn in range(1,len(baseline_noises)):
 		baseline_noise = baseline_noises[bn]
-		writeConfigFiles(cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
+		writeConfigFiles(setnumber, cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
 			gene_copies, fluorophores, laser_wavelength, laser_filter)
 
 
@@ -155,7 +156,7 @@ for ch in range(len(channelCounts)):
 	channelCount = channelCounts[ch]
 	for pn in range(1,len(protein_noises)):
 		protein_noise = protein_noises[pn]
-		writeConfigFiles(cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
+		writeConfigFiles(setnumber, cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
 			gene_copies, fluorophores, laser_wavelength, laser_filter)
 
 
@@ -165,5 +166,5 @@ for ch in range(len(channelCounts)):
 	channelCount = channelCounts[ch]
 	for pd in range(1,len(protein_densities)):
 		protein_density = protein_densities[pd]
-		writeConfigFiles(cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
+		writeConfigFiles(setnumber, cellCount, channelCount, baseline_noise, protein_noise, protein_density, expansion_factor,
 			gene_copies, fluorophores, laser_wavelength, laser_filter)
